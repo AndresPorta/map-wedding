@@ -33,18 +33,18 @@ Proyecto web estático, elegante y responsive para una invitación de boda, insp
 ### 1. Nombres de la pareja
 Editar en `index.html`:
 
-- `Isabella & Leonardo`
-- Monograma `I&L`
+- `Michelle & Andres`
+- Monograma `MAP`
 
 ### 2. Fecha del evento
 Editar en `index.html` y `js/main.js`:
 
-- Texto visible: `20 / junio / 2026`
+- Texto visible: `21 / Noviembre / 2026`
 - Timeline: `20/06/2026 ...`
 - Countdown en `js/main.js`:
 
 ```js
-const weddingDate = new Date('2026-06-20T17:00:00');
+const weddingDate = new Date('2026-11-21T17:00:00');
 ```
 
 ### 3. Mensajes y textos
@@ -60,7 +60,7 @@ Modificar en `index.html`:
 Modificar en `index.html`:
 
 - WhatsApp RSVP:
-  `https://wa.me/5213329345342?text=Hola,%20confirmo%20mi%20asistencia%20a%20la%20boda`
+  `https://wa.me/5218139935005?text=Hola,%20confirmo%20mi%20asistencia%20a%20la%20boda`
 - Google Maps ceremonia:
   `https://maps.app.goo.gl/ggNidnDUjqtDVZHe7`
 - Google Maps recepción:
@@ -114,7 +114,7 @@ assets/images/cta.jpg
 En `index.html` cambia:
 
 ```html
-<img src="https://picsum.photos/seed/isabella-leonardo-hero/900/1200" alt="..." />
+<img src="https://picsum.photos/seed/Michelle-Andres-hero/900/1200" alt="..." />
 ```
 
 por:
@@ -128,7 +128,7 @@ Para el CTA, en `css/styles.css` cambia:
 ```css
 background:
   linear-gradient(135deg, rgba(31, 31, 31, 0.22), rgba(31, 31, 31, 0.42)),
-  url('https://picsum.photos/seed/isabella-leonardo-rsvp/1600/1000') center/cover;
+  url('https://picsum.photos/seed/Michelle-Andres-rsvp/1600/1000') center/cover;
 ```
 
 por:
