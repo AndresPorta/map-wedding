@@ -63,7 +63,7 @@ Modificar en `index.html`:
   `https://wa.me/5218139935005?text=Hola,%20confirmo%20mi%20asistencia%20a%20la%20boda`
 - Google Maps ceremonia:
   `https://maps.app.goo.gl/ggNidnDUjqtDVZHe7`
-- Google Maps recepción:
+- Google Maps Ceremonia:
   `https://maps.app.goo.gl/WsQ4CniAY6Jyo9se6`
 - Liverpool:
   `https://mesaderegalos.liverpool.com.mx/milistaderegalos/51740012`
