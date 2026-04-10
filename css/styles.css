@@ -286,6 +286,13 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
 }
 .btn-whatsapp:hover, .btn-whatsapp:focus-visible { background:#1fb95b; }
 
+.whatsapp-btn-icon {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 /* ── FOOTER ── */
 .site-footer { padding:2rem 0 3rem; }
 .footer-inner {
@@ -638,7 +645,7 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
 }
 
 #itinerario .timeline-copy {
-  max-width: min(34vw, 18rem);
+  max-width: min(46vw, 32rem);
 }
 
 #itinerario .timeline-item:nth-child(odd) .timeline-copy {
@@ -696,16 +703,16 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
   min-width: 7.25rem;
 }
 
-#itinerario .timeline-doodle {
+#itinerario .timeline-icon-image {
   display: block;
   width: 100%;
   height: auto;
-  color: #8b7b63;
+  object-fit: contain;
   opacity: 0.92;
   transition: transform 0.35s ease, opacity 0.35s ease;
 }
 
-#itinerario .timeline-item:hover .timeline-doodle {
+#itinerario .timeline-item:hover .timeline-icon-image {
   transform: translateY(-4px) scale(1.02);
   opacity: 1;
 }
@@ -852,3 +859,4 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
     opacity: 1 !important;
   }
 }
+
