@@ -797,6 +797,27 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
 
 #itinerario .timeline-copy {
   max-width: min(46vw, 32rem);
+  min-width: 0;           /* permite que flex/grid comprima sin romper */
+  overflow-wrap: break-word;
+  word-break: normal;     /* no corta palabras a mitad, solo en espacios */
+  hyphens: auto;          /* si de verdad no cabe, agrega guión en español */
+}
+
+#itinerario .timeline-copy h3 {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+
+/* En mobile muy angosto, ampliar el ancho del copy */
+@media (max-width: 480px) {
+  #itinerario .timeline-copy {
+    max-width: 52vw;
+  }
+  #itinerario .timeline-layout {
+    gap: clamp(0.75rem, 3vw, 1.5rem);
+  }
 }
 
 #itinerario .timeline-item:nth-child(odd) .timeline-copy {
