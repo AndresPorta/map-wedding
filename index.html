@@ -52,11 +52,11 @@
             <h1>Michelle <span>&amp;</span> Andres</h1>
             <p class="event-date">21 / Noviembre / 2026</p>
             <div class="ornament" aria-hidden="true"></div>
-            <p class="hero-text">
-              Con mucha ilusión queremos compartir contigo uno de los días más
-              especiales de nuestra vida.
+
+            <p class="hero-quote">
+              "El inicio de algo<br>que ya era eterno"
             </p>
-            <a class="btn btn-primary" href="#confirmacion">Confirmar asistencia</a>
+            <p class="hero-subquote">Nuestro para siempre comienza aquí</p>
           </div>
 
           <div class="hero-media">
@@ -106,25 +106,45 @@
             <p class="section-kicker">Nuestra historia</p>
             <h2>¡Nos casamos!</h2>
             <p class="lead-text">
-              El amor nos encontró y hoy queremos celebrarlo contigo en el día
-              más importante de nuestra historia.
+              Todo comenzó un 11 de agosto, sin imaginar hasta dónde llegaríamos.
+              El camino ha sido maravilloso, lleno de momentos que nos han unido y nos han hecho crecer juntos.
             </p>
             <p>
-              Gracias por acompañarnos con tu cariño, tu presencia y tu alegría.
-              Nos encantará compartir este momento inolvidable con las personas
-              que más queremos.
+              Hoy damos un paso más en nuestra historia, y no podríamos imaginarlo sin ti.
+              Nos haría muy felices que nos acompañes a celebrar este momento tan importante.
             </p>
           </div>
 
-          <figure class="image-frame image-frame-soft">
-            <img
-              src="./assets/images/book/1.jpg"
-              alt="Segunda foto de la pareja abrazándose"
-              width="900"
-              height="1100"
-              loading="lazy"
-            />
-          </figure>
+          <div class="gallery-carousel image-frame image-frame-soft" aria-label="Galería de fotos de la pareja" role="region">
+            <div class="gallery-track">
+              <figure class="gallery-slide">
+                <img src="./assets/images/book/1.jpg"  alt="Foto de la pareja 1" loading="lazy" />
+              </figure>
+              <figure class="gallery-slide">
+                <img src="./assets/images/book/2.jpg"  alt="Foto de la pareja 2" loading="lazy" />
+              </figure>
+              <figure class="gallery-slide">
+                <img src="./assets/images/book/3.jpg"  alt="Foto de la pareja 3" loading="lazy" />
+              </figure>
+              <figure class="gallery-slide">
+                <img src="./assets/images/book/4.jpg"  alt="Foto de la pareja 4" loading="lazy" />
+              </figure>
+              <figure class="gallery-slide">
+                <img src="./assets/images/book/5.jpg"  alt="Foto de la pareja 5" loading="lazy" />
+              </figure>
+            </div>
+
+            <!-- Flechas -->
+            <button class="gallery-arrow gallery-arrow-prev" aria-label="Foto anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="gallery-arrow gallery-arrow-next" aria-label="Foto siguiente">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+            </button>
+
+            <!-- Dots -->
+            <div class="gallery-dots" aria-hidden="true"></div>
+          </div>
         </div>
       </section>
 
@@ -135,31 +155,79 @@
           <p>Agradecemos tu atención a las siguientes indicaciones:</p>
         </div>
 
-        <div class="container card-grid card-grid-two">
-          <article class="info-card">
-            <div class="icon-badge" aria-hidden="true">👗</div>
-            <h3>Código de vestimenta</h3>
-            <p>
-              <strong>Etiqueta rigurosa (Black Tie).</strong>
-            </p>
-            <p>
-              Mujeres: vestido largo, elegante, sin colores blanco, beige o
-              plata.
-            </p>
-            <p>Hombres: traje oscuro con corbata o moño.</p>
+        <div class="container dress-code-grid">
+
+          <!-- Tarjeta de vestimenta — estilo claro elegante -->
+          <article class="dress-card">
+
+            <div class="dress-card-body">
+              <p class="dress-kicker">Detalles importantes</p>
+              <h3 class="dress-title">Dress code</h3>
+              <p class="dress-subtitle">Total Black</p>
+
+              <figure class="dress-image" aria-hidden="true">
+                <img src="./assets/images/black.png" alt="" />
+              </figure>
+
+              <div class="dress-rules">
+                <div class="dress-rule">
+                  <span class="dress-rule-label">Mujeres</span>
+                  <p>Vestido de noche negro — texturas mate o satinadas, sin aplicaciones de brillo.</p>
+                </div>
+                <div class="dress-divider" aria-hidden="true"></div>
+                <div class="dress-rule">
+                  <span class="dress-rule-label">Hombres</span>
+                  <p>Traje negro, corbata negra y camisa blanca o negra.</p>
+                </div>
+              </div>
+            </div>
+
           </article>
 
-          <article class="info-card">
-            <div class="icon-badge" aria-hidden="true">✉️</div>
-            <h3>RSVP</h3>
-            <p>
-              Favor de confirmar su asistencia antes del
-              <strong>20 de Octubre de 2026.</strong>
-            </p>
-            <p>
-              Tu respuesta nos ayudará a preparar cada detalle con mucho amor.
-            </p>
+          <!-- Tarjeta RSVP -->
+          <article class="dress-card rsvp-card">
+            <div class="dress-card-body">
+              <p class="dress-kicker">Confirmación</p>
+              <h3 class="dress-title">RSVP</h3>
+              <p class="dress-subtitle">Antes del 20 Oct 2026</p>
+
+              <!-- Icono visual protagonista — SVG de sobre/carta -->
+              <figure class="dress-image rsvp-icon" aria-hidden="true">
+                <svg viewBox="0 0 120 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Sobre -->
+                  <rect x="4" y="18" width="112" height="72" rx="6" fill="#1f1f1f"/>
+                  <!-- Solapa abierta -->
+                  <path d="M4 24 L60 62 L116 24" stroke="#fdfaf6" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  <!-- Líneas de texto dentro del sobre (carta) -->
+                  <rect x="30" y="44" width="40" height="3" rx="1.5" fill="rgba(253,250,246,0.25)"/>
+                  <rect x="36" y="52" width="28" height="3" rx="1.5" fill="rgba(253,250,246,0.18)"/>
+                  <!-- Corazón dorado encima del sobre -->
+                  <path d="M60 16 C60 16 52 8 44 8 C37 8 32 14 32 20 C32 30 60 44 60 44 C60 44 88 30 88 20 C88 14 83 8 76 8 C68 8 60 16 60 16Z" fill="#c9a96e"/>
+                </svg>
+              </figure>
+
+              <div class="dress-rules">
+                <div class="dress-rule">
+                  <span class="dress-rule-label">Confirma tu lugar</span>
+                  <p>Tu respuesta nos ayuda a preparar cada detalle con mucho amor.</p>
+                </div>
+                <div class="dress-divider" aria-hidden="true"></div>
+                <div class="dress-rule rsvp-whatsapp-rule">
+                  <span class="dress-rule-label">Escríbenos por</span>
+                  <a
+                    class="btn btn-whatsapp rsvp-wa-btn"
+                    href="https://wa.me/5218139935005?text=Hola,%20confirmo%20mi%20asistencia%20a%20la%20boda"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    WhatsApp
+                  </a>
+                </div>
+              </div>
+            </div>
           </article>
+
         </div>
       </section>
 
@@ -368,28 +436,91 @@
           </p>
         </div>
 
-        <div class="container card-grid card-grid-two">
-          <article class="info-card">
-            <div class="icon-badge" aria-hidden="true">🎁</div>
-            <h3>Liverpool</h3>
-            <p>Evento: 51740012 – Michelle &amp; Andres.</p>
-            <a
-              class="btn btn-primary"
-              href="https://mesaderegalos.liverpool.com.mx/milistaderegalos/51935873"
-              target="_blank"
-              rel="noopener noreferrer"
-              >Ver mesa de regalos</a
-            >
+        <div class="container gift-grid">
+
+          <!-- Liverpool -->
+          <article class="dress-card gift-card">
+            <div class="dress-card-body">
+              <p class="dress-kicker">Mesa de regalos</p>
+              <h3 class="dress-title">Liverpool</h3>
+              <p class="dress-subtitle">Evento 51935873</p>
+
+              <figure class="dress-image gift-icon" aria-hidden="true">
+                <svg viewBox="0 0 110 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- caja del regalo -->
+                  <rect x="10" y="48" width="90" height="48" rx="5" fill="#1f1f1f"/>
+                  <!-- tapa -->
+                  <rect x="6" y="36" width="98" height="16" rx="4" fill="#2e2e2e"/>
+                  <!-- moño vertical -->
+                  <rect x="49" y="36" width="12" height="48" rx="3" fill="#c9a96e"/>
+                  <!-- moño horizontal en tapa -->
+                  <rect x="6" y="41" width="98" height="6" rx="3" fill="#c9a96e"/>
+                  <!-- lazo izquierdo -->
+                  <path d="M55 36 C55 36 30 28 28 14 C26 4 38 2 46 10 C52 16 55 36 55 36Z" fill="#c9a96e"/>
+                  <!-- lazo derecho -->
+                  <path d="M55 36 C55 36 80 28 82 14 C84 4 72 2 64 10 C58 16 55 36 55 36Z" fill="#b28f55"/>
+                  <!-- brillo en la caja -->
+                  <rect x="22" y="56" width="18" height="3" rx="1.5" fill="rgba(255,255,255,0.12)"/>
+                  <rect x="22" y="64" width="12" height="3" rx="1.5" fill="rgba(255,255,255,0.08)"/>
+                </svg>
+              </figure>
+
+              <div class="dress-rules">
+                <div class="dress-rule">
+                  <span class="dress-rule-label">Michelle &amp; Andrés</span>
+                  <p>Encuentra nuestra lista de regalos seleccionada con mucho cariño.</p>
+                </div>
+                <div class="dress-divider" aria-hidden="true"></div>
+                <div class="dress-rule">
+                  <a
+                    class="btn btn-primary gift-btn"
+                    href="https://mesaderegalos.liverpool.com.mx/milistaderegalos/51935873"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >Ver mesa de regalos</a>
+                </div>
+              </div>
+            </div>
           </article>
 
-          <article class="info-card">
-            <div class="icon-badge" aria-hidden="true">💌</div>
-            <h3>Lluvia de sobres</h3>
-            <p>
-              Durante la recepción encontrarás un espacio especial para depositar
-              tu obsequio en efectivo.
-            </p>
+          <!-- Regalo físico -->
+          <article class="dress-card gift-card gift-physical">
+            <div class="dress-card-body">
+              <p class="dress-kicker">¿Prefieres algo físico?</p>
+              <h3 class="dress-title">Regalo<br>en mano</h3>
+              <p class="dress-subtitle">Bienvenido con amor</p>
+
+              <figure class="dress-image gift-icon" aria-hidden="true">
+                <svg viewBox="0 0 110 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- manos recibiendo -->
+                  <path d="M20 72 C20 72 15 65 18 58 C21 51 30 52 34 57 L55 42 C59 38 66 39 68 44 C70 49 67 54 63 56 L72 50 C76 47 82 49 83 54 C84 59 81 63 77 65 L82 61 C86 58 91 61 91 66 C91 71 87 75 83 77 L60 88 C52 92 42 90 36 85 Z" fill="#1f1f1f"/>
+                  <!-- caja/paquete encima -->
+                  <rect x="32" y="18" width="46" height="38" rx="4" fill="#c9a96e"/>
+                  <rect x="32" y="18" width="46" height="10" rx="4" fill="#b28f55"/>
+                  <rect x="52" y="18" width="6" height="38" rx="2" fill="rgba(255,255,255,0.3)"/>
+                  <rect x="32" y="21" width="46" height="4" rx="2" fill="rgba(255,255,255,0.2)"/>
+                  <!-- estrella de bienvenida -->
+                  <circle cx="88" cy="20" r="10" fill="#1f1f1f"/>
+                  <text x="88" y="24" text-anchor="middle" font-size="11" fill="#c9a96e">✓</text>
+                </svg>
+              </figure>
+
+              <div class="dress-rules">
+                <div class="dress-rule">
+                  <span class="dress-rule-label">El día del evento</span>
+                  <p>Si lo prefieres, puedes traer tu regalo físico directamente al evento — habrá un espacio especial para recibirlo.</p>
+                </div>
+                <div class="dress-divider" aria-hidden="true"></div>
+                <div class="dress-rule">
+                  <p class="gift-note">
+                    <span class="gift-note-icon" aria-hidden="true">💛</span>
+                    Tu presencia ya es nuestro mayor regalo.
+                  </p>
+                </div>
+              </div>
+            </div>
           </article>
+
         </div>
       </section>
 
@@ -397,23 +528,34 @@
         <div class="container">
           <article class="cta-panel">
             <div class="cta-overlay"></div>
+
             <div class="cta-content">
-              <p class="section-kicker light">Celebra con nosotros</p>
-              <h2>¡Confirma tu asistencia por favor!</h2>
-              <p>Haz click en el botón de WhatsApp</p>
+              <p class="cta-eyebrow">21 · Noviembre · 2026</p>
+
+              <h2 class="cta-heading">
+                Sé parte de<br><em>nuestra historia</em>
+              </h2>
+
+              <div class="cta-ornament" aria-hidden="true"></div>
+
+              <p class="cta-body">
+                Confirma tu asistencia antes del <strong>20 de Octubre</strong>.<br>
+                Tu presencia es el regalo más grande.
+              </p>
+
               <a
-                class="btn btn-whatsapp"
+                class="btn cta-wa-btn"
                 href="https://wa.me/5215526714343?text=Hola,%20confirmo%20mi%20asistencia%20a%20la%20boda"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-              <img
-              src="./assets/images/itinerary/wps.png"
-              alt=""
-              aria-hidden="true"
-              class="whatsapp-btn-icon"
-              />
-            Confirmar por WhatsApp
+                <img
+                  src="./assets/images/itinerary/wps.png"
+                  alt=""
+                  aria-hidden="true"
+                  class="whatsapp-btn-icon"
+                />
+                Confirmar por WhatsApp
               </a>
             </div>
           </article>
@@ -424,10 +566,10 @@
     <footer class="site-footer">
       <div class="container footer-inner">
         <div>
-          <div class="brand-mark footer-mark">I<span>&</span>L</div>
+          <div class="brand-mark footer-mark">M<span>A</span>P</div>
           <p>© Copyright 2026. Todos los derechos reservados.</p>
         </div>
-        <a href="#" aria-label="Aviso de privacidad">Aviso de privacidad</a>
+        <a href="#" aria-label="Arriba">Arriba</a>
       </div>
     </footer>
 

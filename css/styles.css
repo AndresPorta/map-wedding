@@ -137,7 +137,28 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
 .hero-grid, .two-column-grid { display:grid; gap:2.5rem; }
 .hero-copy { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; }
 .hero-copy .eyebrow { margin-top:1.25rem; }
-.hero-text { max-width:560px; margin-bottom:2rem; font-size:1.08rem; }
+/* Frase principal — grande, cursiva, protagonista */
+.hero-quote {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: clamp(1.9rem, 3.8vw, 2.8rem);
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text);
+  margin: 0 0 0.75rem;
+  max-width: 520px;
+}
+
+/* Subtítulo — pequeño, dorado, espaciado */
+.hero-subquote {
+  font-family: 'Lato', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--primary-dark);
+  margin: 0;
+}
 .event-date {
   margin-top:1.2rem; color:var(--text);
   font-size:1rem; font-weight:700; letter-spacing:0.28em; text-transform:uppercase;
@@ -160,7 +181,34 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
 }
 .image-frame img { width:100%; height:100%; object-fit:cover; transition:transform 0.7s ease; }
 .image-frame:hover img { transform:scale(1.04); }
-.image-frame-tall { min-height:min(70vh,760px); }
+
+.image-frame-tall {
+  /* Desktop: altura generosa */
+  min-height: min(70vh, 760px);
+}
+.image-frame-tall img {
+  object-position: top center;
+}
+
+/* Mobile: la imagen no tiene altura fija del padre,
+   así que forzamos la imagen a tener su propia altura
+   y object-fit hace el resto */
+@media (max-width: 899px) {
+  .image-frame-tall {
+    min-height: 0;   /* quitamos el min-height que causaba el recorte */
+    height: auto;
+  }
+  .image-frame-tall img {
+    width: 100%;
+    height: auto;    /* la imagen respira — muestra su altura natural */
+    object-fit: initial;
+    object-position: initial;
+    max-height: 85vh;
+    object-fit: cover;
+    object-position: top center;
+  }
+}
+
 .image-frame-soft { min-height:520px; }
 
 /* ── COUNTDOWN ── */
@@ -262,29 +310,131 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
 .btn-outline:hover, .btn-outline:focus-visible { border-color:var(--primary); color:var(--primary-dark); }
 
 /* ── CTA ── */
+/* ── CTA PANEL ── */
 .cta-panel {
-  position:relative; overflow:hidden; min-height:440px;
-  border-radius:34px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 34px;
+  min-height: 460px;
+  /* Oscuro suficiente para que el texto blanco siempre lea bien */
   background:
-    linear-gradient(135deg,rgba(31,31,31,0.22),rgba(31,31,31,0.42)),
-    url('https://picsum.photos/seed/Michelle-Andres-rsvp/1600/1000') center/cover;
-  box-shadow:0 18px 45px rgba(31,31,31,0.16);
+    linear-gradient(180deg,
+      rgba(8,8,8,0.62) 0%,
+      rgba(8,8,8,0.52) 50%,
+      rgba(8,8,8,0.68) 100%
+    ),
+    url('../assets/images/book/rsv.jpg') center 30% / cover no-repeat;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.24);
 }
+
+/* Viñeta perimetral — hace que la foto se integre, no flote */
 .cta-overlay {
-  position:absolute; inset:0;
-  background:radial-gradient(circle at center,rgba(201,169,110,0.24),transparent 45%);
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%,
+    rgba(201,169,110,0.10) 0%,
+    transparent 65%
+  );
+  pointer-events: none;
 }
+
+/* Contenido: columna centrada, limpio */
 .cta-content {
-  position:relative; z-index:1;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  min-height:inherit; padding:clamp(2rem,6vw,4rem); text-align:center;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0;
+  min-height: 460px;
+  padding: clamp(3rem, 8vw, 5rem) clamp(1.5rem, 6vw, 4rem);
 }
-.cta-content h2, .cta-content p { color:var(--white); }
+
+.cta-eyebrow {
+  font-family: 'Lato', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin: 0 0 1.1rem;
+}
+
+.cta-heading {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.8rem, 6vw, 4.4rem);
+  font-weight: 600;
+  line-height: 1.05;
+  color: #ffffff;
+  margin: 0 0 1.4rem;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+}
+
+.cta-heading em {
+  font-style: italic;
+  color: rgba(255,255,255,0.90);
+}
+
+/* Línea ornamental centrada */
+.cta-ornament {
+  width: 70px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  margin: 0 auto 1.4rem;
+}
+
+.cta-body {
+  color: rgba(255,255,255,0.78);
+  font-size: 1rem;
+  line-height: 1.7;
+  max-width: 420px;
+  margin: 0 0 2.2rem;
+}
+
+.cta-body strong {
+  color: rgba(255,255,255,0.96);
+  font-weight: 700;
+}
+
+/* Botón WhatsApp */
+.cta-wa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1rem 2.2rem;
+  background: #25d366;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 6px 24px rgba(37,211,102,0.38);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.25s ease;
+  animation: waPulse 3s ease infinite;
+}
+
+.cta-wa-btn:hover {
+  transform: translateY(-3px) scale(1.03);
+  background: #1db954;
+  box-shadow: 0 10px 32px rgba(37,211,102,0.50);
+  animation: none;
+}
+
+@keyframes waPulse {
+  0%, 100% { box-shadow: 0 6px 24px rgba(37,211,102,0.38), 0 0 0 0   rgba(37,211,102,0.28); }
+  55%       { box-shadow: 0 6px 24px rgba(37,211,102,0.38), 0 0 0 12px rgba(37,211,102,0);   }
+}
+
+/* btn-whatsapp legacy — otros lugares del sitio */
 .btn-whatsapp {
-  margin-top:1rem; background:#25d366; color:var(--white);
-  box-shadow:0 12px 30px rgba(37,211,102,0.24);
+  margin-top: 1rem;
+  background: #25d366;
+  color: var(--white);
+  box-shadow: 0 12px 30px rgba(37,211,102,0.24);
 }
-.btn-whatsapp:hover, .btn-whatsapp:focus-visible { background:#1fb95b; }
+.btn-whatsapp:hover, .btn-whatsapp:focus-visible { background: #1fb95b; }
 
 .whatsapp-btn-icon {
   width: 25px;
@@ -400,7 +550,8 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
 }
 
 .anim-ready p,
-.anim-ready .hero-text,
+.anim-ready .hero-quote,
+.anim-ready .hero-subquote,
 .anim-ready .lead-text,
 .anim-ready time {
   opacity: 0;
@@ -860,3 +1011,437 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
   }
 }
 
+
+
+/* ════════════════════════════════════════════
+   GALERÍA CARRUSEL — sección bienvenida
+   ════════════════════════════════════════════ */
+
+.gallery-carousel {
+  position: relative;
+  overflow: hidden;
+  /* hereda border-radius y sombra de .image-frame */
+  cursor: grab;
+  user-select: none;
+}
+.gallery-carousel:active { cursor: grabbing; }
+
+/* Track: flex sin wrap, se mueve con transform */
+.gallery-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.gallery-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.gallery-slide img {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  /* transición de zoom en la imagen activa */
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity   0.5s ease;
+  transform: scale(1.04);
+  opacity: 0.85;
+}
+
+/* La imagen del slide activo se "asienta" */
+.gallery-slide.is-active img {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* ── Flechas ── */
+.gallery-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.55);
+  background: rgba(253,250,246,0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
+  opacity: 0;   /* ocultas por defecto, aparecen en hover */
+}
+
+.gallery-carousel:hover .gallery-arrow { opacity: 1; }
+
+.gallery-arrow svg { width: 18px; height: 18px; }
+
+.gallery-arrow-prev { left: 14px; }
+.gallery-arrow-next { right: 14px; }
+
+.gallery-arrow:hover {
+  background: rgba(255,255,255,0.96);
+  transform: translateY(-50%) scale(1.08);
+}
+.gallery-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* ── Dots ── */
+.gallery-dots {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.gallery-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(255,255,255,0.4);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
+  padding: 0;
+}
+
+.gallery-dot.is-active {
+  background: var(--white);
+  width: 22px;
+  border-radius: 999px;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+/* Gradiente sutil abajo para que los dots lean bien */
+.gallery-carousel::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 80px;
+  background: linear-gradient(to top, rgba(0,0,0,0.22), transparent);
+  pointer-events: none;
+  z-index: 3;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Swipe en touch — sin cursor grab */
+@media (hover: none) {
+  .gallery-carousel { cursor: default; }
+  .gallery-carousel:active { cursor: default; }
+  .gallery-arrow { opacity: 0.85; } /* siempre visibles en touch */
+}
+
+
+/* ════════════════════════════════════════════
+   DRESS CODE CARD — estilo claro elegante
+   ════════════════════════════════════════════ */
+
+.dress-code-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+/* — Tarjeta principal — */
+.dress-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  transition: box-shadow 0.35s ease, transform 0.35s ease;
+}
+
+.dress-card:hover {
+  box-shadow: 0 12px 40px rgba(201,169,110,0.15), 0 4px 16px rgba(0,0,0,0.06);
+  transform: translateY(-3px);
+}
+
+/* Halo dorado decorativo en esquina superior derecha */
+.dress-card::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,169,110,0.13) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* — Cuerpo: centra todo verticalmente — */
+.dress-card-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: clamp(2rem, 4vw, 2.8rem) clamp(1.5rem, 4vw, 2.5rem);
+  gap: 0;
+}
+
+/* Kicker dorado */
+.dress-kicker {
+  font-family: 'Lato', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--primary-dark);
+  margin-bottom: 0.6rem;
+}
+
+/* Título en Cormorant cursiva — como la referencia */
+.dress-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: clamp(2.6rem, 5vw, 3.6rem);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text);
+  margin: 0 0 0.3rem;
+  letter-spacing: 0.01em;
+}
+
+/* Subtítulo "Total Black" */
+.dress-subtitle {
+  font-family: 'Lato', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin: 0 0 0.2rem;
+}
+
+/* — Imagen silueta centrada — */
+.dress-image {
+  margin: 1.2rem 0 1rem;
+  pointer-events: none;
+  transition: transform 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+
+.dress-card:hover .dress-image {
+  transform: translateY(-5px) scale(1.03);
+}
+
+.dress-image img {
+  width: clamp(140px, 22vw, 200px);
+  height: auto;
+  display: block;
+  /* La silueta es negra sobre transparente — queda perfecta sobre fondo claro */
+}
+
+/* Línea ornamental entre imagen y reglas */
+.dress-image::after {
+  content: '';
+  display: block;
+  width: 60px;
+  height: 1px;
+  margin: 1.2rem auto 0;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+}
+
+/* — Reglas mujeres / hombres — */
+.dress-rules {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 0;
+  margin-top: 0.4rem;
+}
+
+.dress-rule {
+  padding: 0.85rem 0;
+  text-align: center;
+}
+
+.dress-rule-label {
+  display: inline-block;
+  font-family: 'Lato', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--primary-dark);
+  margin-bottom: 0.3rem;
+}
+
+.dress-rule p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  max-width: 360px;
+  margin-inline: auto;
+}
+
+.dress-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,169,110,0.4), transparent);
+  margin-inline: 2rem;
+}
+
+/* — Tarjeta RSVP — */
+.rsvp-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* — Responsive — */
+@media (min-width: 700px) {
+  .dress-code-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 480px) {
+  .dress-image img { width: 120px; }
+  .dress-title     { font-size: 2.2rem; }
+}
+
+
+/* ════════════════════════════════════════════
+   RSVP CARD — espejo del dress code
+   ════════════════════════════════════════════ */
+
+/* Icono SVG protagonista — mismo tamaño que la imagen del dress code */
+.rsvp-icon {
+  width: clamp(130px, 20vw, 175px);
+}
+
+.rsvp-icon svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  /* Sombra suave bajo el sobre */
+  filter: drop-shadow(0 8px 20px rgba(0,0,0,0.10));
+  transition: transform 0.6s cubic-bezier(0.16,1,0.3,1),
+              filter 0.4s ease;
+}
+
+.rsvp-card:hover .rsvp-icon svg {
+  transform: translateY(-5px) scale(1.03);
+  filter: drop-shadow(0 14px 28px rgba(201,169,110,0.22));
+}
+
+/* Fila del botón WhatsApp dentro de las reglas */
+.rsvp-whatsapp-rule {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+/* Botón WhatsApp adaptado al estilo de la tarjeta */
+.rsvp-wa-btn {
+  margin-top: 0;
+  padding: 0.75rem 1.6rem;
+  font-size: 0.88rem;
+  gap: 0.5rem;
+  box-shadow: 0 8px 24px rgba(37,211,102,0.20);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.rsvp-wa-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(37,211,102,0.30);
+}
+
+@media (max-width: 480px) {
+  .rsvp-icon { width: 110px; }
+}
+
+
+/* ════════════════════════════════════════════
+   GIFT CARDS — mismo lenguaje que dress code
+   ════════════════════════════════════════════ */
+
+.gift-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 700px) {
+  .gift-grid { grid-template-columns: 1fr 1fr; align-items: stretch; }
+}
+
+/* Icono SVG de regalo — mismo tamaño que dress/rsvp */
+.gift-icon {
+  width: clamp(120px, 18vw, 165px);
+}
+
+.gift-icon svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,0.10));
+  transition: transform 0.6s cubic-bezier(0.16,1,0.3,1),
+              filter 0.4s ease;
+}
+
+.gift-card:hover .gift-icon svg {
+  transform: translateY(-5px) scale(1.04);
+  filter: drop-shadow(0 14px 26px rgba(201,169,110,0.20));
+}
+
+/* Botón dentro de la tarjeta */
+.gift-btn {
+  margin-top: 0;
+  font-size: 0.88rem;
+  padding: 0.75rem 1.6rem;
+}
+
+/* Tarjeta de regalo físico — tono ligeramente más cálido */
+.gift-physical {
+  background: linear-gradient(
+    160deg,
+    rgba(255,255,255,0.95) 0%,
+    rgba(253,247,238,0.95) 100%
+  );
+}
+
+/* Nota final — el mensaje emocional */
+.gift-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-style: italic;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.05rem;
+  color: var(--text) !important;
+  margin: 0;
+}
+
+.gift-note-icon {
+  font-size: 1rem;
+  line-height: 1;
+}

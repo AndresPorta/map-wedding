@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSmoothScroll();
   initStickyHeader();
   initRippleButtons();
+  initGalleryCarousel();
   initCursorGlow();
 });
 
@@ -474,4 +475,150 @@ function initCursorGlow() {
     requestAnimationFrame(tick);
   };
   tick();
+}
+
+
+/* ─────────────────────────────────────────
+   GALERÍA CARRUSEL
+   - Auto-avanza cada 4.5s
+   - Pausa al hover / touch
+   - Flechas + dots clicables
+   - Swipe táctil
+   - Teclado (← →) cuando tiene foco
+   ───────────────────────────────────────── */
+function initGalleryCarousel() {
+  const carousel = document.querySelector('.gallery-carousel');
+  if (!carousel) return;
+
+  const track    = carousel.querySelector('.gallery-track');
+  const slides   = Array.from(carousel.querySelectorAll('.gallery-slide'));
+  const dotsWrap = carousel.querySelector('.gallery-dots');
+  const btnPrev  = carousel.querySelector('.gallery-arrow-prev');
+  const btnNext  = carousel.querySelector('.gallery-arrow-next');
+
+  if (!track || !slides.length) return;
+
+  let current   = 0;
+  let autoTimer = null;
+  const DELAY   = 4500;
+  const total   = slides.length;
+
+  /* — Dots — */
+  slides.forEach((_, i) => {
+    const dot = document.createElement('button');
+    dot.className  = 'gallery-dot';
+    dot.setAttribute('aria-label', `Foto ${i + 1}`);
+    dot.addEventListener('click', () => goTo(i));
+    dotsWrap.appendChild(dot);
+  });
+
+  const dots = Array.from(dotsWrap.querySelectorAll('.gallery-dot'));
+
+  /* — Ir a slide — */
+  function goTo(index, direction = 'next') {
+    slides[current].classList.remove('is-active');
+    dots[current].classList.remove('is-active');
+
+    current = ((index % total) + total) % total;
+
+    track.style.transform = `translateX(-${current * 100}%)`;
+    slides[current].classList.add('is-active');
+    dots[current].classList.add('is-active');
+  }
+
+  function next() { goTo(current + 1, 'next'); }
+  function prev() { goTo(current - 1, 'prev'); }
+
+  /* — Auto-play — */
+  function startAuto() {
+    stopAuto();
+    autoTimer = setInterval(next, DELAY);
+  }
+  function stopAuto() {
+    clearInterval(autoTimer);
+    autoTimer = null;
+  }
+
+  /* — Flechas — */
+  btnPrev.addEventListener('click', () => { prev(); startAuto(); });
+  btnNext.addEventListener('click', () => { next(); startAuto(); });
+
+  /* — Pausa en hover (desktop) — */
+  carousel.addEventListener('mouseenter', stopAuto);
+  carousel.addEventListener('mouseleave', startAuto);
+
+  /* — Swipe táctil — */
+  let touchStartX = 0;
+  let touchDeltaX = 0;
+  let isDragging  = false;
+
+  carousel.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchDeltaX = 0;
+    isDragging  = true;
+    stopAuto();
+  }, { passive: true });
+
+  carousel.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    touchDeltaX = e.touches[0].clientX - touchStartX;
+    /* feedback visual sutil mientras arrastra */
+    const offset = current * 100;
+    const drag   = (touchDeltaX / carousel.offsetWidth) * 100;
+    track.style.transition = 'none';
+    track.style.transform  = `translateX(calc(-${offset}% + ${drag * 0.4}px))`;
+  }, { passive: true });
+
+  carousel.addEventListener('touchend', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    track.style.transition = '';  /* restaurar transición CSS */
+
+    if (touchDeltaX < -50)       next();
+    else if (touchDeltaX > 50)   prev();
+    else                         goTo(current); /* snap de vuelta */
+
+    startAuto();
+  });
+
+  /* — Drag con mouse — */
+  let mouseStartX = 0;
+  let mouseDown   = false;
+
+  carousel.addEventListener('mousedown', e => {
+    mouseStartX = e.clientX;
+    mouseDown   = true;
+    stopAuto();
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!mouseDown) return;
+    const delta = e.clientX - mouseStartX;
+    const offset = current * 100;
+    track.style.transition = 'none';
+    track.style.transform  = `translateX(calc(-${offset}% + ${delta * 0.4}px))`;
+  });
+
+  window.addEventListener('mouseup', e => {
+    if (!mouseDown) return;
+    mouseDown = false;
+    track.style.transition = '';
+    const delta = e.clientX - mouseStartX;
+    if (delta < -60)       next();
+    else if (delta > 60)   prev();
+    else                   goTo(current);
+    startAuto();
+  });
+
+  /* — Teclado — */
+  carousel.setAttribute('tabindex', '0');
+  carousel.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft')  { prev(); startAuto(); }
+    if (e.key === 'ArrowRight') { next(); startAuto(); }
+  });
+
+  /* — Iniciar — */
+  goTo(0);
+  startAuto();
 }
