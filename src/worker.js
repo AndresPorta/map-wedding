@@ -72,6 +72,29 @@ export default {
       return json({ ok: true, name: guest.name });
     }
 
+    // ── API: cancelar asistencia ──
+    if (path === '/api/cancel' && method === 'POST') {
+      let body;
+      try { body = await request.json(); }
+      catch { return json({ error: 'JSON inválido' }, 400); }
+
+      const code = body?.code?.trim()?.toLowerCase();
+      if (!code) return json({ error: 'Código requerido' }, 400);
+
+      const guest = await env.MAP_DB.prepare(
+        'SELECT id, name FROM guests WHERE code = ?'
+      ).bind(code).first();
+
+      if (!guest) return json({ error: 'Invitado no encontrado' }, 404);
+
+      // Pone confirmed = 0 pero NO toca los boletos
+      await env.MAP_DB.prepare(
+        "UPDATE guests SET confirmed = 0, confirmed_at = NULL WHERE code = ?"
+      ).bind(code).run();
+
+      return json({ ok: true, name: guest.name });
+    }
+
     // ── ADMIN: panel de confirmaciones ──
     if (path === '/admin') {
       const key = url.searchParams.get('key');
