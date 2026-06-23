@@ -2,13 +2,22 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "map-wedding",
   "compatibility_date": "2026-04-08",
+  "main": "src/worker.js",
   "observability": {
     "enabled": true
   },
   "assets": {
-    "directory": "."
+    "directory": ".",
+    "binding": "ASSETS"
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "MAP_DB",
+      "database_name": "map-wedding-db",
+      "database_id": "2971f1fa-34d2-4e74-9a33-6873a9400e9d"
+    }
   ]
 }
