@@ -1400,6 +1400,38 @@ h3 { font-size: clamp(1.6rem,3vw,2rem);      font-weight: 600; }
   .rsvp-icon { width: 110px; }
 }
 
+/* ── Contador de boletos dentro de la tarjeta RSVP personalizada ── */
+.rsvp-tickets-display {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.rsvp-tickets-display span:first-child {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.8rem, 8vw, 3.8rem);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.rsvp-tickets-label {
+  font-size: 0.88rem;
+  color: var(--text-soft);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+/* ── Estado: ya confirmó ── */
+#rsvp-card.is-confirmed .rsvp-wa-btn {
+  background: #16a34a;
+  box-shadow: 0 8px 24px rgba(22,163,74,0.25);
+  pointer-events: none;
+  cursor: default;
+}
+#rsvp-card.is-confirmed .rsvp-wa-btn::before {
+  content: '✓ ';
+}
+
 
 /* ════════════════════════════════════════════
    GIFT CARDS — mismo lenguaje que dress code
