@@ -1,10 +1,5 @@
 /* ============================================================
    invite.js — Invitaciones personalizadas MAP
-   Si la URL tiene ?code=xxx:
-     · Personaliza la tarjeta RSVP (nombre como título, boletos, estado)
-     · Muestra popup flotante con X + botón cancelar
-     · Confirma / cancela asistencia contra la API (D1)
-   Si no hay código: la tarjeta queda en su estado genérico.
    ============================================================ */
 
 (function () {
@@ -14,7 +9,7 @@
   fetch(`/api/guest?code=${encodeURIComponent(code)}`)
     .then(r => r.json())
     .then(data => {
-      if (!data.ok) return; // código inválido → sin cambios
+      if (!data.ok) return;
 
       const { name, tickets } = data;
       let isConfirmed = !!data.confirmed;
@@ -33,11 +28,11 @@
       const cancelBtn     = document.getElementById('rsvp-cancel-btn');
 
       // ── Activar tarjeta personal ──
-      if (kickerEl)       kickerEl.textContent      = 'Invitación personal';
-      if (titleEl)        titleEl.textContent        = name;           // sólo el nombre, sin "Hola,"
-      if (ticketCountEl)  ticketCountEl.textContent  = tickets;
-      if (defaultEl)      defaultEl.style.display    = 'none';
-      if (personalEl)     personalEl.style.display   = 'block';
+      if (kickerEl)       kickerEl.textContent     = 'Invitación personal';
+      if (titleEl)        titleEl.textContent       = name;
+      if (ticketCountEl)  ticketCountEl.textContent = tickets;
+      if (defaultEl)      defaultEl.style.display   = 'none';
+      if (personalEl)     personalEl.style.display  = 'block';
 
       // ── Botón WhatsApp ──
       if (waBtn) {
@@ -45,7 +40,6 @@
           `Hola, confirmo mi asistencia a la boda de Michelle & Andres.\nSoy ${name} y asistiré con ${tickets} lugar${tickets > 1 ? 'es' : ''}.`
         );
         waBtn.href = `https://wa.me/5215526714343?text=${msg}`;
-
         waBtn.addEventListener('click', () => {
           fetch('/api/confirm', {
             method:  'POST',
@@ -54,73 +48,16 @@
           })
           .then(r => r.json())
           .then(() => applyConfirmedState())
-          .catch(() => {/* silencioso */});
+          .catch(() => {});
         });
       }
 
-      // ── Estado: confirmado ──
-      function applyConfirmedState() {
-        isConfirmed = true;
-        if (subtitleEl)    subtitleEl.textContent    = '¡Listo! Tu asistencia fue confirmada 🎉';
-        if (actionLabelEl) actionLabelEl.textContent  = '¡Confirmado!';
-        if (cardEl)        cardEl.classList.add('is-confirmed');
-        if (cancelSection) cancelSection.style.display = 'block';
-        refreshPopup(false);
-      }
-
-      // ── Estado: cancelado ──
-      function applyCancelledState() {
-        isConfirmed = false;
-        if (subtitleEl)    subtitleEl.textContent    = 'Lamentamos que no puedas acompañarnos';
-        if (cardEl)        cardEl.classList.remove('is-confirmed');
-        if (cardEl)        cardEl.classList.add('is-cancelled');
-        if (cancelSection) cancelSection.style.display = 'none';
-        if (actionLabelEl) actionLabelEl.textContent   = '';
-        if (waBtn)         waBtn.style.display          = 'none';
-
-        // Reemplazar contenido personal con mensaje de cancelación
-        if (personalEl) {
-          personalEl.innerHTML = `
-            <div class="dress-rule" style="text-align:center;padding:1.25rem 0;">
-              <p style="font-size:1.6rem;margin-bottom:.5rem;">💔</p>
-              <p style="color:#888;line-height:1.6;">¡Gracias!<br>Lamentamos que no puedas acompañarnos.</p>
-            </div>
-          `;
-        }
-
-        refreshPopup(true);
-      }
-
-      // ── Aplicar estado inicial ──
-      if (isConfirmed) {
-        applyConfirmedState();
-      } else {
-        if (subtitleEl)    subtitleEl.textContent    = `Tu invitación es para ${tickets} persona${tickets > 1 ? 's' : ''}`;
-        if (actionLabelEl) actionLabelEl.textContent  = 'Confirma tu asistencia';
-      }
-
-      // ── Botón cancelar (en la tarjeta) ──
-      if (cancelBtn) {
-        cancelBtn.addEventListener('click', handleCancel);
-      }
-
-      function handleCancel() {
-        fetch('/api/cancel', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ code }),
-        })
-        .then(r => r.json())
-        .then(() => applyCancelledState())
-        .catch(() => {/* silencioso */});
-      }
-
       // ─────────────────────────────────────────
-      //  POPUP FLOTANTE
+      //  POPUP FLOTANTE — se crea ANTES de aplicar estados
       // ─────────────────────────────────────────
-      const popup  = document.createElement('div');
+      const popup      = document.createElement('div');
       const popupInner = document.createElement('div');
-      popup.id = 'invite-popup';
+      popup.id      = 'invite-popup';
       popupInner.id = 'invite-popup-inner';
 
       Object.assign(popup.style, {
@@ -139,14 +76,13 @@
 
       popup.appendChild(popupInner);
       document.body.appendChild(popup);
-      renderPopupContent(false);
 
       // ── Renderiza el contenido del popup ──
       function renderPopupContent(cancelled) {
         if (cancelled) {
           popupInner.innerHTML = `
             <button id="popup-close-btn" aria-label="Cerrar" style="position:absolute;top:.75rem;right:.9rem;background:none;border:none;cursor:pointer;font-size:1.1rem;color:#aaa;line-height:1;padding:0;">✕</button>
-            <div style="padding:.25rem 0 .25rem;text-align:center;">
+            <div style="padding:.25rem 0;text-align:center;">
               <p style="font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:.6rem;">Cancelación registrada</p>
               <p style="color:#555;font-size:.95rem;line-height:1.55;">¡Gracias! lamentamos que no puedas acompañarnos.</p>
             </div>
@@ -173,24 +109,70 @@
           `;
         }
 
-        popup.style.position = 'fixed'; // garantizar posición fija tras rerender
-
         // Eventos del popup
         const closeBtn = document.getElementById('popup-close-btn');
         if (closeBtn) closeBtn.addEventListener('click', closePopup);
-
         const popupCancelBtn = document.getElementById('popup-cancel-btn');
         if (popupCancelBtn) popupCancelBtn.addEventListener('click', handleCancel);
-      }
-
-      function refreshPopup(cancelled) {
-        renderPopupContent(cancelled);
       }
 
       function closePopup() {
         popup.style.opacity   = '0';
         popup.style.transform = 'translateY(12px)';
         setTimeout(() => popup.remove(), 300);
+      }
+
+      // ── Estado: confirmado ──
+      function applyConfirmedState() {
+        isConfirmed = true;
+        if (subtitleEl)    subtitleEl.textContent   = '¡Listo! Tu asistencia fue confirmada 🎉';
+        if (actionLabelEl) actionLabelEl.textContent = '¡Confirmado!';
+        if (cardEl)        cardEl.classList.add('is-confirmed');
+        if (cancelSection) cancelSection.style.display = 'block';
+        renderPopupContent(false);
+      }
+
+      // ── Estado: cancelado ──
+      function applyCancelledState() {
+        isConfirmed = false;
+        if (subtitleEl)    subtitleEl.textContent   = 'Lamentamos que no puedas acompañarnos';
+        if (cardEl)        cardEl.classList.remove('is-confirmed');
+        if (cardEl)        cardEl.classList.add('is-cancelled');
+        if (cancelSection) cancelSection.style.display = 'none';
+        if (actionLabelEl) actionLabelEl.textContent   = '';
+        if (waBtn)         waBtn.style.display          = 'none';
+        if (personalEl) {
+          personalEl.innerHTML = `
+            <div class="dress-rule" style="text-align:center;padding:1.25rem 0;">
+              <p style="font-size:1.6rem;margin-bottom:.5rem;">💔</p>
+              <p style="color:#888;line-height:1.6;">¡Gracias!<br>Lamentamos que no puedas acompañarnos.</p>
+            </div>
+          `;
+        }
+        renderPopupContent(true);
+      }
+
+      // ── Botón cancelar (en la tarjeta) ──
+      function handleCancel() {
+        fetch('/api/cancel', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ code }),
+        })
+        .then(r => r.json())
+        .then(() => applyCancelledState())
+        .catch(() => {});
+      }
+
+      if (cancelBtn) cancelBtn.addEventListener('click', handleCancel);
+
+      // ── Aplicar estado inicial (popup ya existe) ──
+      if (isConfirmed) {
+        applyConfirmedState();
+      } else {
+        if (subtitleEl)    subtitleEl.textContent   = `Tu invitación es para ${tickets} persona${tickets > 1 ? 's' : ''}`;
+        if (actionLabelEl) actionLabelEl.textContent = 'Confirma tu asistencia';
+        renderPopupContent(false);
       }
 
       // ── Scroll suave a la tarjeta RSVP ──
@@ -203,5 +185,5 @@
         }
       }, 800);
     })
-    .catch(() => {/* Sin conexión o código inválido → sin cambios */});
+    .catch(() => {});
 })();
