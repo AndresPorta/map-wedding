@@ -99,6 +99,14 @@
             </button>
           ` : '';
 
+          const confirmBtn = !isConfirmed ? `
+            <a id="popup-wa-btn"
+               href="${waBtn ? waBtn.href : '#'}"
+               target="_blank" rel="noopener noreferrer"
+               style="display:flex;align-items:center;justify-content:center;gap:.5rem;margin-top:.85rem;background:#25d366;color:#fff;border-radius:999px;padding:.6rem 1.1rem;font-size:.88rem;font-weight:600;text-decoration:none;">
+              Confirmar
+            </a>` : '';
+
           popupInner.innerHTML = `
             <button id="popup-close-btn" aria-label="Cerrar" style="position:absolute;top:.75rem;right:.9rem;background:none;border:none;cursor:pointer;font-size:1.1rem;color:#aaa;line-height:1;padding:0;">✕</button>
             <p style="font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c9a96e;margin-bottom:.35rem;">Invitación personal</p>
@@ -106,6 +114,7 @@
             <span style="display:inline-flex;align-items:center;gap:.4rem;background:#fdf6e3;border-radius:999px;padding:.28rem .75rem;font-size:.8rem;color:#8a6900;border:1px solid #f0dca0;">
               🎫 Tu invitación es para ${tickets} persona${tickets > 1 ? 's' : ''}
             </span>
+            ${confirmBtn}
             ${confirmedBlock}
           `;
         }
