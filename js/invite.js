@@ -12,8 +12,8 @@
       if (!data.ok) return;
 
       const { name, tickets } = data;
-      let isConfirmed  = !!data.confirmed;
-      let wasCancelled = !!data.cancelled;
+      let isConfirmed  = data.confirmed  === true;
+      let wasCancelled = data.cancelled  === true;
 
       // ── Referencias al DOM ──
       const cardEl        = document.getElementById('rsvp-card');

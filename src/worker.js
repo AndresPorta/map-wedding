@@ -1,5 +1,6 @@
 /**
  * MAP Wedding — Cloudflare Worker
+ * Estados de confirmed: 0 = pendiente, 1 = confirmó, -1 = canceló
  */
 
 const ADMIN_KEY      = 'map2026admin';
@@ -43,12 +44,17 @@ export default {
       if (!code) return json({ error: 'Código requerido' }, 400);
 
       const guest = await env.MAP_DB.prepare(
-        'SELECT name, tickets, confirmed, confirmed_at FROM guests WHERE code = ?'
+        'SELECT name, tickets, confirmed FROM guests WHERE code = ?'
       ).bind(code.trim().toLowerCase()).first();
 
       if (!guest) return json({ error: 'Invitado no encontrado' }, 404);
-      const cancelled = !guest.confirmed && !!guest.confirmed_at;
-      return json({ ok: true, name: guest.name, tickets: guest.tickets, confirmed: !!guest.confirmed, cancelled });
+      return json({
+        ok:        true,
+        name:      guest.name,
+        tickets:   guest.tickets,
+        confirmed: guest.confirmed === 1,
+        cancelled: guest.confirmed === -1,
+      });
     }
 
     // ── POST /api/confirm ──
@@ -65,7 +71,7 @@ export default {
       ).bind(code).first();
 
       if (!guest) return json({ error: 'Invitado no encontrado' }, 404);
-      if (guest.confirmed) return json({ ok: true, alreadyConfirmed: true, name: guest.name });
+      if (guest.confirmed === 1) return json({ ok: true, alreadyConfirmed: true, name: guest.name });
 
       await env.MAP_DB.prepare(
         "UPDATE guests SET confirmed = 1, confirmed_at = datetime('now') WHERE code = ?"
@@ -89,9 +95,9 @@ export default {
 
       if (!guest) return json({ error: 'Invitado no encontrado' }, 404);
 
-      // confirmed=0 + confirmed_at presente = canceló (≠ "nunca respondió")
+      // confirmed = -1 → canceló (sin tocar confirmed_at)
       await env.MAP_DB.prepare(
-        "UPDATE guests SET confirmed = 0, confirmed_at = datetime('now') WHERE code = ?"
+        'UPDATE guests SET confirmed = -1 WHERE code = ?'
       ).bind(code).run();
 
       return json({ ok: true, name: guest.name });
@@ -116,25 +122,33 @@ export default {
       });
     }
 
-    // ── POST /admin/reset  → desbloquear invitado cancelado ──
-    if (path === '/admin/reset' && method === 'POST') {
+    // ── POST /admin/set-status  → cambiar estado desde el admin ──
+    if (path === '/admin/set-status' && method === 'POST') {
       if (!isAdminAuthed(request, url)) return json({ error: 'No autorizado' }, 401);
 
       let body;
       try { body = await request.json(); }
       catch { return json({ error: 'JSON inválido' }, 400); }
 
-      const code = body?.code?.trim()?.toLowerCase();
-      if (!code) return json({ error: 'Código requerido' }, 400);
+      const code   = body?.code?.trim()?.toLowerCase();
+      const status = body?.status; // 'confirmed' | 'pending' | 'cancelled'
+      if (!code || !['confirmed','pending','cancelled'].includes(status)) {
+        return json({ error: 'Parámetros inválidos' }, 400);
+      }
+
+      const value = status === 'confirmed' ? 1 : status === 'cancelled' ? -1 : 0;
+      const atSql = status === 'confirmed'
+        ? "confirmed = ?, confirmed_at = datetime('now')"
+        : 'confirmed = ?, confirmed_at = NULL';
 
       await env.MAP_DB.prepare(
-        'UPDATE guests SET confirmed = 0, confirmed_at = NULL WHERE code = ?'
-      ).bind(code).run();
+        `UPDATE guests SET ${atSql} WHERE code = ?`
+      ).bind(value, code).run();
 
       return json({ ok: true });
     }
 
-    // ── POST /admin/guests/add  → agregar nuevo invitado ──
+    // ── POST /admin/guests/add ──
     if (path === '/admin/guests/add' && method === 'POST') {
       if (!isAdminAuthed(request, url)) return json({ error: 'No autorizado' }, 401);
 
@@ -150,7 +164,6 @@ export default {
 
       if (!name || !code) return json({ error: 'Nombre y código son requeridos' }, 400);
 
-      // Verificar que el código no exista
       const existing = await env.MAP_DB.prepare(
         'SELECT id FROM guests WHERE code = ?'
       ).bind(code).first();
@@ -177,11 +190,11 @@ export default {
       ).all();
 
       const total     = results.length;
-      const confirmed = results.filter(g => g.confirmed).length;
-      const cancelled = results.filter(g => !g.confirmed && g.confirmed_at).length;
+      const confirmed = results.filter(g => g.confirmed === 1).length;
+      const cancelled = results.filter(g => g.confirmed === -1).length;
       const pending   = total - confirmed - cancelled;
       const seats     = results.reduce((s, g) => s + g.tickets, 0);
-      const seatsConf = results.filter(g => g.confirmed).reduce((s, g) => s + g.tickets, 0);
+      const seatsConf = results.filter(g => g.confirmed === 1).reduce((s, g) => s + g.tickets, 0);
 
       return new Response(adminDashboardHTML(results, { total, confirmed, cancelled, pending, seats, seatsConf }), {
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
@@ -198,29 +211,33 @@ export default {
 // ─────────────────────────────────────────────
 function adminDashboardHTML(guests, stats) {
   const rows = guests.map(g => {
-    const isCancelled = !g.confirmed && !!g.confirmed_at;
-    const badgeClass  = g.confirmed ? 'badge-yes' : isCancelled ? 'badge-cancel' : 'badge-no';
-    const badgeText   = g.confirmed ? '✓ Confirmó' : isCancelled ? '✕ Canceló' : '— Pendiente';
-    const rowClass    = g.confirmed ? 'confirmed' : isCancelled ? 'cancelled' : 'pending';
+    const status     = g.confirmed === 1 ? 'confirmed' : g.confirmed === -1 ? 'cancelled' : 'pending';
+    const badgeClass = status === 'confirmed' ? 'badge-yes' : status === 'cancelled' ? 'badge-cancel' : 'badge-no';
+    const badgeText  = status === 'confirmed' ? '✓ Confirmó' : status === 'cancelled' ? '✕ Canceló' : '— Pendiente';
+    const rowClass   = status;
 
-    const resetBtn = isCancelled ? `
-      <button class="btn-action btn-reset" onclick="resetGuest('${escHtml(g.code)}', this)" title="Volver a pendiente">
-        🔓 Desbloquear
-      </button>` : '';
+    const otherStatuses = ['confirmed','pending','cancelled']
+      .filter(s => s !== status)
+      .map(s => {
+        const label = s === 'confirmed' ? '✓ Confirmó' : s === 'cancelled' ? '✕ Canceló' : '— Pendiente';
+        return `<button class="status-opt" onclick="setStatus('${escHtml(g.code)}','${s}',event)">${label}</button>`;
+      }).join('');
 
     return `
     <tr class="${rowClass}" data-code="${escHtml(g.code)}">
       <td>${escHtml(g.name)}</td>
       <td class="center">${g.tickets}</td>
       <td class="center">
-        <span class="badge ${badgeClass}">${badgeText}</span>
+        <div class="badge-wrap">
+          <span class="badge ${badgeClass}" onclick="toggleMenu(this)" title="Clic para cambiar estado">${badgeText} ▾</span>
+          <div class="status-menu">${otherStatuses}</div>
+        </div>
       </td>
       <td class="soft">${g.confirmed_at ? g.confirmed_at.replace('T',' ').substring(0,16) : '—'}</td>
       <td class="soft">${g.phone ? escHtml(g.phone) : '—'}</td>
       <td class="soft">${g.notes ? escHtml(g.notes) : ''}</td>
-      <td class="center actions-cell">
+      <td class="center">
         <button class="btn-action btn-copy" onclick="copyLink('${escHtml(g.code)}', this)">🔗 Copiar</button>
-        ${resetBtn}
       </td>
     </tr>`;
   }).join('');
@@ -234,8 +251,8 @@ function adminDashboardHTML(guests, stats) {
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui,sans-serif;background:#f5f5f5;color:#222;padding:2rem 1rem}
-  h1{font-size:1.5rem;margin-bottom:.5rem;color:#1a1a1a}
   .header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem}
+  h1{font-size:1.5rem;color:#1a1a1a}
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1rem;margin-bottom:2rem}
   .stat{background:#fff;border-radius:12px;padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.07);text-align:center}
   .stat-num{font-size:2rem;font-weight:700;color:#2563eb}
@@ -249,24 +266,26 @@ function adminDashboardHTML(guests, stats) {
   tr:last-child td{border-bottom:none}
   tr.confirmed td{background:#f0fdf4}
   tr.cancelled td{background:#fff5f5}
-  .badge{display:inline-block;padding:.22rem .65rem;border-radius:999px;font-size:.76rem;font-weight:600}
+  /* Badge con menú */
+  .badge-wrap{position:relative;display:inline-block}
+  .badge{display:inline-block;padding:.25rem .7rem;border-radius:999px;font-size:.76rem;font-weight:600;cursor:pointer;user-select:none;transition:opacity .15s}
+  .badge:hover{opacity:.85}
   .badge-yes{background:#dcfce7;color:#166534}
   .badge-no{background:#fef3c7;color:#92400e}
   .badge-cancel{background:#fee2e2;color:#991b1b}
+  .status-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:100;min-width:130px;overflow:hidden}
+  .status-menu.open{display:block}
+  .status-opt{display:block;width:100%;padding:.55rem .9rem;background:none;border:none;cursor:pointer;font-size:.82rem;text-align:left;transition:background .1s}
+  .status-opt:hover{background:#f1f5f9}
   .center{text-align:center}
   .soft{color:#888;font-size:.81rem}
-  .actions-cell{display:flex;gap:.4rem;justify-content:center;align-items:center;flex-wrap:wrap}
-  .btn-action{padding:.35rem .8rem;border-radius:8px;border:1px solid #e2e8f0;cursor:pointer;font-size:.79rem;font-weight:500;background:#f8fafc;color:#334155;transition:all .15s;white-space:nowrap}
+  .btn-action{padding:.35rem .8rem;border-radius:8px;border:1px solid #e2e8f0;cursor:pointer;font-size:.79rem;font-weight:500;background:#f8fafc;color:#334155;transition:all .15s}
   .btn-action:hover{background:#e2e8f0}
   .btn-action.copied{background:#dcfce7;color:#166534;border-color:#bbf7d0}
-  .btn-reset{border-color:#fecaca;color:#b91c1c;background:#fff5f5}
-  .btn-reset:hover{background:#fee2e2}
-  .btn-reset.done{background:#dcfce7;color:#166534;border-color:#bbf7d0}
   .bottom-row{margin-top:1.5rem;display:flex;gap:1rem;flex-wrap:wrap}
   .btn{padding:.65rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.9rem;font-weight:600}
   .btn-green{background:#16a34a;color:#fff}
   .btn-primary{background:#1e293b;color:#fff}
-
   /* Modal */
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
   .modal-overlay.open{display:flex}
@@ -274,9 +293,8 @@ function adminDashboardHTML(guests, stats) {
   .modal h2{font-size:1.15rem;margin-bottom:1.25rem;color:#1a1a1a}
   .field{margin-bottom:1rem}
   .field label{display:block;font-size:.8rem;font-weight:600;color:#555;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.06em}
-  .field input,.field select,.field textarea{width:100%;padding:.65rem .9rem;border:1px solid #ddd;border-radius:8px;font-size:.95rem;font-family:inherit}
-  .field input:focus,.field select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
-  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+  .field input{width:100%;padding:.65rem .9rem;border:1px solid #ddd;border-radius:8px;font-size:.95rem;font-family:inherit}
+  .field input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
   .modal-actions{display:flex;gap:.75rem;margin-top:1.5rem;justify-content:flex-end}
   .btn-cancel-modal{background:#f1f5f9;color:#334155;padding:.65rem 1.2rem;border-radius:8px;border:none;cursor:pointer;font-size:.9rem;font-weight:600}
   .msg-success{background:#dcfce7;color:#166534;padding:.75rem 1rem;border-radius:8px;font-size:.88rem;margin-top:.75rem;display:none}
@@ -300,7 +318,7 @@ function adminDashboardHTML(guests, stats) {
 
 <table>
   <thead><tr>
-    <th>Nombre</th><th>Boletos</th><th>Estado</th><th>Fecha</th><th>Teléfono</th><th>Notas</th><th>Acciones</th>
+    <th>Nombre</th><th>Boletos</th><th>Estado</th><th>Fecha</th><th>Teléfono</th><th>Notas</th><th>Link</th>
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
@@ -339,36 +357,63 @@ function adminDashboardHTML(guests, stats) {
 </div>
 
 <script>
+// ── Cerrar menús abiertos al hacer clic fuera ──
+document.addEventListener('click', e => {
+  if (!e.target.closest('.badge-wrap')) {
+    document.querySelectorAll('.status-menu.open').forEach(m => m.classList.remove('open'));
+  }
+});
+
+// ── Toggle menú de estado ──
+function toggleMenu(badge) {
+  const menu = badge.nextElementSibling;
+  const wasOpen = menu.classList.contains('open');
+  document.querySelectorAll('.status-menu.open').forEach(m => m.classList.remove('open'));
+  if (!wasOpen) menu.classList.add('open');
+}
+
+// ── Cambiar estado desde admin ──
+function setStatus(code, status, e) {
+  e.stopPropagation();
+  const row     = document.querySelector('tr[data-code="' + code + '"]');
+  const menu    = row.querySelector('.status-menu');
+  const badge   = row.querySelector('.badge');
+  menu.classList.remove('open');
+
+  const labels   = { confirmed:'✓ Confirmó', pending:'— Pendiente', cancelled:'✕ Canceló' };
+  const classes  = { confirmed:'badge-yes',  pending:'badge-no',     cancelled:'badge-cancel' };
+  const rowCls   = { confirmed:'confirmed',  pending:'pending',       cancelled:'cancelled' };
+
+  fetch('/admin/set-status', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ code, status })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.ok) { alert('Error al cambiar estado'); return; }
+    // Actualizar badge
+    badge.className = 'badge ' + classes[status];
+    badge.textContent = labels[status] + ' ▾';
+    // Actualizar fila
+    ['confirmed','pending','cancelled'].forEach(c => row.classList.remove(c));
+    row.classList.add(rowCls[status]);
+    // Actualizar opciones del menú
+    const others = ['confirmed','pending','cancelled'].filter(s => s !== status);
+    menu.innerHTML = others.map(s =>
+      '<button class="status-opt" onclick="setStatus(\\''+code+'\\',\\''+s+'\\',event)">'+labels[s]+'</button>'
+    ).join('');
+  })
+  .catch(() => alert('Error de red'));
+}
+
 // ── Copy link ──
 function copyLink(code, btn) {
-  const url = 'https://map-wedding.com/?code=' + code;
-  navigator.clipboard.writeText(url).then(() => {
+  navigator.clipboard.writeText('https://map-wedding.com/?code=' + code).then(() => {
     btn.textContent = '✓ Copiado';
     btn.classList.add('copied');
     setTimeout(() => { btn.textContent = '🔗 Copiar'; btn.classList.remove('copied'); }, 2000);
   });
-}
-
-// ── Desbloquear invitado cancelado ──
-function resetGuest(code, btn) {
-  if (!confirm('¿Volver a poner a este invitado como Pendiente?')) return;
-  fetch('/admin/reset', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ code })
-  })
-  .then(r => r.json())
-  .then(d => {
-    if (!d.ok) { alert('Error al desbloquear'); return; }
-    const row = btn.closest('tr');
-    row.className = 'pending';
-    row.querySelector('.badge').className = 'badge badge-no';
-    row.querySelector('.badge').textContent = '— Pendiente';
-    btn.textContent = '✓ Desbloqueado';
-    btn.classList.add('done');
-    btn.disabled = true;
-  })
-  .catch(() => alert('Error de red'));
 }
 
 // ── Modal ──
