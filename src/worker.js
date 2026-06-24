@@ -315,17 +315,11 @@ function adminDashboardHTML(guests, stats) {
     <h2>Agregar invitado</h2>
     <div class="field">
       <label>Nombre completo *</label>
-      <input type="text" id="f-name" placeholder="Ej: Ana López" oninput="autoCode()"/>
+      <input type="text" id="f-name" placeholder="Ej: Ana López"/>
     </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Boletos *</label>
-        <input type="number" id="f-tickets" value="1" min="1" max="20"/>
-      </div>
-      <div class="field">
-        <label>Código *</label>
-        <input type="text" id="f-code" placeholder="ana-lopez"/>
-      </div>
+    <div class="field">
+      <label>Boletos *</label>
+      <input type="number" id="f-tickets" value="1" min="1" max="20" style="max-width:120px"/>
     </div>
     <div class="field">
       <label>Teléfono</label>
@@ -384,7 +378,7 @@ function openModal() {
 }
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
-  ['f-name','f-code','f-phone','f-notes'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-phone','f-notes'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-tickets').value = 1;
   document.getElementById('modal-success').style.display = 'none';
   document.getElementById('modal-error').style.display = 'none';
@@ -393,25 +387,23 @@ function closeModalOutside(e) {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 }
 
-function autoCode() {
-  const name = document.getElementById('f-name').value;
-  const code = name.toLowerCase()
-    .normalize('NFD').replace(/[\\u0300-\\u036f]/g,'')
-    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-  document.getElementById('f-code').value = code;
+function randomCode() {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(8)))
+    .map(b => chars[b % chars.length]).join('');
 }
 
 function submitGuest() {
   const name    = document.getElementById('f-name').value.trim();
   const tickets = parseInt(document.getElementById('f-tickets').value) || 1;
-  const code    = document.getElementById('f-code').value.trim().toLowerCase();
+  const code    = randomCode();
   const phone   = document.getElementById('f-phone').value.trim() || null;
   const notes   = document.getElementById('f-notes').value.trim() || null;
   const errEl   = document.getElementById('modal-error');
   const okEl    = document.getElementById('modal-success');
 
   errEl.style.display = 'none';
-  if (!name || !code) { errEl.textContent = 'Nombre y código son obligatorios.'; errEl.style.display = 'block'; return; }
+  if (!name) { errEl.textContent = 'El nombre es obligatorio.'; errEl.style.display = 'block'; return; }
 
   fetch('/admin/guests/add', {
     method: 'POST',
