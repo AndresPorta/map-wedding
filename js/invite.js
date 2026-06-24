@@ -124,6 +124,20 @@
         if (closeBtn) closeBtn.addEventListener('click', closePopup);
         const popupCancelBtn = document.getElementById('popup-cancel-btn');
         if (popupCancelBtn) popupCancelBtn.addEventListener('click', handleCancel);
+        // Botón confirmar del popup → llama API + abre WhatsApp
+        const popupWaBtn = document.getElementById('popup-wa-btn');
+        if (popupWaBtn) {
+          popupWaBtn.addEventListener('click', () => {
+            fetch('/api/confirm', {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify({ code }),
+            })
+            .then(r => r.json())
+            .then(() => applyConfirmedState())
+            .catch(() => {});
+          });
+        }
       }
 
       function closePopup() {
