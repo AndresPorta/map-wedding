@@ -43,11 +43,13 @@ export default {
       if (!code) return json({ error: 'Código requerido' }, 400);
 
       const guest = await env.MAP_DB.prepare(
-        'SELECT name, tickets, confirmed FROM guests WHERE code = ?'
+        'SELECT name, tickets, confirmed, confirmed_at FROM guests WHERE code = ?'
       ).bind(code.trim().toLowerCase()).first();
 
       if (!guest) return json({ error: 'Invitado no encontrado' }, 404);
-      return json({ ok: true, name: guest.name, tickets: guest.tickets, confirmed: !!guest.confirmed });
+      // confirmed=0 + confirmed_at presente → canceló (distingue de "nunca respondió")
+      const cancelled = !guest.confirmed && !!guest.confirmed_at;
+      return json({ ok: true, name: guest.name, tickets: guest.tickets, confirmed: !!guest.confirmed, cancelled });
     }
 
     // ── API: confirmar asistencia ──
@@ -88,9 +90,10 @@ export default {
 
       if (!guest) return json({ error: 'Invitado no encontrado' }, 404);
 
-      // Pone confirmed = 0 pero NO toca los boletos
+      // Pone confirmed = 0 pero conserva confirmed_at como marca de cancelación
+      // (confirmed=0 + confirmed_at NOT NULL = canceló; confirmed=0 + confirmed_at NULL = nunca respondió)
       await env.MAP_DB.prepare(
-        "UPDATE guests SET confirmed = 0, confirmed_at = NULL WHERE code = ?"
+        "UPDATE guests SET confirmed = 0, confirmed_at = datetime('now') WHERE code = ?"
       ).bind(code).run();
 
       return json({ ok: true, name: guest.name });

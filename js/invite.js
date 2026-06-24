@@ -12,7 +12,8 @@
       if (!data.ok) return;
 
       const { name, tickets } = data;
-      let isConfirmed = !!data.confirmed;
+      let isConfirmed  = !!data.confirmed;
+      let wasCancelled = !!data.cancelled;
 
       // ── Referencias al DOM ──
       const cardEl        = document.getElementById('rsvp-card');
@@ -93,8 +94,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               ¡Listo! Tu asistencia fue confirmada 🎉
             </p>
-            <button id="popup-cancel-btn" style="display:block;margin-top:.6rem;background:none;border:none;cursor:pointer;font-size:.78rem;color:#bbb;text-decoration:underline;padding:0;text-align:left;">
-              cancelar asistencia
+            <button id="popup-cancel-btn" style="display:block;margin-top:.75rem;background:none;border:1.5px solid #e8b4b0;border-radius:999px;cursor:pointer;font-size:.8rem;color:#c0392b;padding:.45rem 1.1rem;font-weight:500;">
+              Cancelar asistencia
             </button>
           ` : '';
 
@@ -169,6 +170,8 @@
       // ── Aplicar estado inicial (popup ya existe) ──
       if (isConfirmed) {
         applyConfirmedState();
+      } else if (wasCancelled) {
+        applyCancelledState();
       } else {
         if (subtitleEl)    subtitleEl.textContent   = `Tu invitación es para ${tickets} persona${tickets > 1 ? 's' : ''}`;
         if (actionLabelEl) actionLabelEl.textContent = 'Confirma tu asistencia';
