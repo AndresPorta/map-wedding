@@ -176,6 +176,45 @@ export default {
       return json({ ok: true, code });
     }
 
+    // ── POST /admin/guests/edit ──
+    if (path === '/admin/guests/edit' && method === 'POST') {
+      if (!isAdminAuthed(request, url)) return json({ error: 'No autorizado' }, 401);
+
+      let body;
+      try { body = await request.json(); }
+      catch { return json({ error: 'JSON inválido' }, 400); }
+
+      const code    = body?.code?.trim()?.toLowerCase();
+      const name    = body?.name?.trim();
+      const tickets = parseInt(body?.tickets) || 1;
+      const phone   = body?.phone?.trim() || null;
+      const notes   = body?.notes?.trim() || null;
+
+      if (!code || !name) return json({ error: 'Código y nombre son requeridos' }, 400);
+
+      await env.MAP_DB.prepare(
+        'UPDATE guests SET name = ?, tickets = ?, phone = ?, notes = ? WHERE code = ?'
+      ).bind(name, tickets, phone, notes, code).run();
+
+      return json({ ok: true });
+    }
+
+    // ── POST /admin/guests/delete ──
+    if (path === '/admin/guests/delete' && method === 'POST') {
+      if (!isAdminAuthed(request, url)) return json({ error: 'No autorizado' }, 401);
+
+      let body;
+      try { body = await request.json(); }
+      catch { return json({ error: 'JSON inválido' }, 400); }
+
+      const code = body?.code?.trim()?.toLowerCase();
+      if (!code) return json({ error: 'Código requerido' }, 400);
+
+      await env.MAP_DB.prepare('DELETE FROM guests WHERE code = ?').bind(code).run();
+
+      return json({ ok: true });
+    }
+
     // ── GET /admin ──
     if (path === '/admin') {
       if (!isAdminAuthed(request, url)) {
@@ -236,8 +275,10 @@ function adminDashboardHTML(guests, stats) {
       <td class="soft">${g.confirmed_at ? g.confirmed_at.replace('T',' ').substring(0,16) : '—'}</td>
       <td class="soft">${g.phone ? escHtml(g.phone) : '—'}</td>
       <td class="soft">${g.notes ? escHtml(g.notes) : ''}</td>
-      <td class="center">
+      <td class="center actions-cell">
         <button class="btn-action btn-copy" onclick="copyLink('${escHtml(g.code)}', this)">🔗 Copiar</button>
+        <button class="btn-action btn-edit" onclick="openEditModal('${escHtml(g.code)}','${escHtml(g.name)}',${g.tickets},'${escHtml(g.phone||'')}','${escHtml(g.notes||'')}')">✏️ Editar</button>
+        <button class="btn-action btn-delete" onclick="deleteGuest('${escHtml(g.code)}','${escHtml(g.name)}')">🗑️ Eliminar</button>
       </td>
     </tr>`;
   }).join('');
@@ -282,6 +323,11 @@ function adminDashboardHTML(guests, stats) {
   .btn-action{padding:.35rem .8rem;border-radius:8px;border:1px solid #e2e8f0;cursor:pointer;font-size:.79rem;font-weight:500;background:#f8fafc;color:#334155;transition:all .15s}
   .btn-action:hover{background:#e2e8f0}
   .btn-action.copied{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+  .btn-edit{border-color:#bfdbfe;color:#1d4ed8;background:#eff6ff}
+  .btn-edit:hover{background:#dbeafe}
+  .btn-delete{border-color:#fecaca;color:#b91c1c;background:#fff5f5}
+  .btn-delete:hover{background:#fee2e2}
+  .actions-cell{display:flex;gap:.4rem;justify-content:center;flex-wrap:wrap}
   .bottom-row{margin-top:1.5rem;display:flex;gap:1rem;flex-wrap:wrap}
   .btn{padding:.65rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.9rem;font-weight:600}
   .btn-green{background:#16a34a;color:#fff}
@@ -352,6 +398,35 @@ function adminDashboardHTML(guests, stats) {
     <div class="modal-actions">
       <button class="btn-cancel-modal" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="submitGuest()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: editar invitado -->
+<div class="modal-overlay" id="edit-overlay" onclick="closeEditOutside(event)">
+  <div class="modal">
+    <h2>Editar invitado</h2>
+    <input type="hidden" id="e-code"/>
+    <div class="field">
+      <label>Nombre completo *</label>
+      <input type="text" id="e-name"/>
+    </div>
+    <div class="field">
+      <label>Boletos *</label>
+      <input type="number" id="e-tickets" min="1" max="20" style="max-width:120px"/>
+    </div>
+    <div class="field">
+      <label>Teléfono</label>
+      <input type="text" id="e-phone"/>
+    </div>
+    <div class="field">
+      <label>Notas</label>
+      <input type="text" id="e-notes"/>
+    </div>
+    <div class="msg-error" id="edit-error"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel-modal" onclick="closeEditModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitEdit()">Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -462,6 +537,70 @@ function submitGuest() {
     setTimeout(() => location.reload(), 1200);
   })
   .catch(() => { errEl.textContent = 'Error de red.'; errEl.style.display = 'block'; });
+}
+
+// ── Editar invitado ──
+function openEditModal(code, name, tickets, phone, notes) {
+  document.getElementById('e-code').value    = code;
+  document.getElementById('e-name').value    = name;
+  document.getElementById('e-tickets').value = tickets;
+  document.getElementById('e-phone').value   = phone;
+  document.getElementById('e-notes').value   = notes;
+  document.getElementById('edit-error').style.display = 'none';
+  document.getElementById('edit-overlay').classList.add('open');
+  document.getElementById('e-name').focus();
+}
+function closeEditModal() {
+  document.getElementById('edit-overlay').classList.remove('open');
+}
+function closeEditOutside(e) {
+  if (e.target === document.getElementById('edit-overlay')) closeEditModal();
+}
+function submitEdit() {
+  const code    = document.getElementById('e-code').value;
+  const name    = document.getElementById('e-name').value.trim();
+  const tickets = parseInt(document.getElementById('e-tickets').value) || 1;
+  const phone   = document.getElementById('e-phone').value.trim() || null;
+  const notes   = document.getElementById('e-notes').value.trim() || null;
+  const errEl   = document.getElementById('edit-error');
+
+  errEl.style.display = 'none';
+  if (!name) { errEl.textContent = 'El nombre es obligatorio.'; errEl.style.display = 'block'; return; }
+
+  fetch('/admin/guests/edit', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ code, name, tickets, phone, notes })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.ok) { errEl.textContent = d.error || 'Error al guardar.'; errEl.style.display = 'block'; return; }
+    // Actualizar fila en el DOM sin recargar
+    const row = document.querySelector('tr[data-code="' + code + '"]');
+    const cells = row.querySelectorAll('td');
+    cells[0].textContent = name;
+    cells[1].textContent = tickets;
+    cells[4].textContent = phone || '—';
+    cells[5].textContent = notes || '';
+    closeEditModal();
+  })
+  .catch(() => { errEl.textContent = 'Error de red.'; errEl.style.display = 'block'; });
+}
+
+// ── Eliminar invitado ──
+function deleteGuest(code, name) {
+  if (!confirm('¿Eliminar a ' + name + '? Esta acción no se puede deshacer.')) return;
+  fetch('/admin/guests/delete', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ code })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.ok) { alert('Error al eliminar'); return; }
+    document.querySelector('tr[data-code="' + code + '"]').remove();
+  })
+  .catch(() => alert('Error de red'));
 }
 
 // ── Export CSV ──
