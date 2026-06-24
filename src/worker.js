@@ -7,8 +7,9 @@
  *   *                          → archivos estáticos (index.html, css, js, etc.)
  */
 
-// ── Contraseña del panel admin (cámbiala antes de desplegar) ──
-const ADMIN_KEY = 'map2026admin';
+// ── Contraseña del panel admin ──
+const ADMIN_KEY  = 'map2026admin';
+const SESSION_COOKIE = 'map_admin_session';
 
 // ── CORS headers para las rutas API ──
 const CORS = {
@@ -95,10 +96,34 @@ export default {
       return json({ ok: true, name: guest.name });
     }
 
+    // ── ADMIN: login POST (recibe clave del formulario, emite cookie) ──
+    if (path === '/admin/login' && method === 'POST') {
+      const form = await request.formData();
+      const key  = form.get('key');
+      if (key !== ADMIN_KEY) {
+        return new Response(adminLoginHTML('Contraseña incorrecta.'), {
+          status: 401,
+          headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+        });
+      }
+      return new Response(null, {
+        status: 302,
+        headers: {
+          'Location': '/admin',
+          'Set-Cookie': `${SESSION_COOKIE}=${ADMIN_KEY}; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`,
+        },
+      });
+    }
+
     // ── ADMIN: panel de confirmaciones ──
     if (path === '/admin') {
-      const key = url.searchParams.get('key');
-      if (key !== ADMIN_KEY) {
+      // Soporte legacy: ?key=xxx en URL
+      const urlKey    = url.searchParams.get('key');
+      const cookieStr = request.headers.get('Cookie') || '';
+      const cookieKey = cookieStr.split(';').find(c => c.trim().startsWith(SESSION_COOKIE + '='))?.split('=')[1]?.trim();
+      const authed    = urlKey === ADMIN_KEY || cookieKey === ADMIN_KEY;
+
+      if (!authed) {
         return new Response(adminLoginHTML(), {
           status: 401,
           headers: { 'Content-Type': 'text/html;charset=UTF-8' },
@@ -106,7 +131,7 @@ export default {
       }
 
       const { results } = await env.MAP_DB.prepare(
-        'SELECT name, tickets, confirmed, confirmed_at, phone, notes FROM guests ORDER BY confirmed DESC, name ASC'
+        'SELECT code, name, tickets, confirmed, confirmed_at, phone, notes FROM guests ORDER BY confirmed DESC, name ASC'
       ).all();
 
       const total     = results.length;
@@ -142,6 +167,11 @@ function adminDashboardHTML(guests, stats) {
       <td class="soft">${g.confirmed_at ? g.confirmed_at.replace('T', ' ').substring(0, 16) : '—'}</td>
       <td class="soft">${g.phone ? escHtml(g.phone) : '—'}</td>
       <td class="soft">${g.notes ? escHtml(g.notes) : ''}</td>
+      <td class="center">
+        <button class="btn btn-copy" onclick="copyLink('${escHtml(g.code)}', this)" title="Copiar link personalizado">
+          🔗 Copiar
+        </button>
+      </td>
     </tr>`).join('');
 
   return `<!DOCTYPE html>
@@ -174,6 +204,9 @@ function adminDashboardHTML(guests, stats) {
   .btn{padding:.6rem 1.2rem;border-radius:8px;border:none;cursor:pointer;font-size:.88rem;font-weight:600;text-decoration:none;display:inline-block}
   .btn-blue{background:#2563eb;color:#fff}
   .btn-green{background:#16a34a;color:#fff}
+  .btn-copy{background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;padding:.4rem .9rem;border-radius:8px;cursor:pointer;font-size:.82rem;transition:background .15s}
+  .btn-copy:hover{background:#e2e8f0}
+  .btn-copy.copied{background:#dcfce7;color:#166534;border-color:#bbf7d0}
 </style>
 </head>
 <body>
@@ -187,7 +220,7 @@ function adminDashboardHTML(guests, stats) {
 </div>
 <table>
   <thead><tr>
-    <th>Nombre</th><th>Boletos</th><th>Estado</th><th>Confirmó el</th><th>Teléfono</th><th>Notas</th>
+    <th>Nombre</th><th>Boletos</th><th>Estado</th><th>Confirmó el</th><th>Teléfono</th><th>Notas</th><th>Link</th>
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
@@ -195,10 +228,19 @@ function adminDashboardHTML(guests, stats) {
   <button class="btn btn-green" onclick="exportCSV()">⬇ Exportar CSV</button>
 </div>
 <script>
+function copyLink(code, btn) {
+  const url = 'https://map-wedding.com/?code=' + code;
+  navigator.clipboard.writeText(url).then(() => {
+    btn.textContent = '✓ Copiado';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '🔗 Copiar'; btn.classList.remove('copied'); }, 2000);
+  });
+}
 function exportCSV(){
   const rows=[['Nombre','Boletos','Confirmado','Fecha','Telefono','Notas']];
   document.querySelectorAll('tbody tr').forEach(tr=>{
-    rows.push([...tr.querySelectorAll('td')].map(td=>'"'+td.innerText.replace(/"/g,'""')+'"'));
+    const cells=[...tr.querySelectorAll('td')].slice(0,6);
+    rows.push(cells.map(td=>'"'+td.innerText.replace(/"/g,'""')+'"'));
   });
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows.map(r=>r.join(',')).join('\\n'));
@@ -208,7 +250,7 @@ function exportCSV(){
 </body></html>`;
 }
 
-function adminLoginHTML() {
+function adminLoginHTML(error = '') {
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"/>
 <title>Admin · MAP</title>
@@ -218,16 +260,15 @@ function adminLoginHTML() {
   h2{margin-bottom:1.5rem;font-size:1.2rem}
   input{width:100%;padding:.7rem 1rem;border:1px solid #ddd;border-radius:8px;font-size:1rem;margin-bottom:1rem}
   button{width:100%;padding:.75rem;background:#1e293b;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:600}
+  .error{color:#dc2626;font-size:.85rem;margin-bottom:.75rem}
 </style></head>
 <body>
-<form onsubmit="go(event)">
+<form method="POST" action="/admin/login">
   <h2>Panel MAP</h2>
-  <input type="password" id="k" placeholder="Contraseña" autofocus/>
+  ${error ? `<p class="error">${error}</p>` : ''}
+  <input type="password" name="key" placeholder="Contraseña" autofocus/>
   <button>Entrar</button>
 </form>
-<script>
-function go(e){e.preventDefault();location.href='/admin?key='+document.getElementById('k').value}
-</script>
 </body></html>`;
 }
 
