@@ -157,7 +157,7 @@ export default {
       if (existing) return json({ error: 'El código ya existe' }, 409);
 
       await env.MAP_DB.prepare(
-        'INSERT INTO guests (name, code, tickets, phone, notes, confirmed) VALUES (?, ?, ?, ?, ?, 0)'
+        'INSERT INTO guests (name, code, tickets, phone, notes, confirmed, confirmed_at) VALUES (?, ?, ?, ?, ?, 0, NULL)'
       ).bind(name, code, tickets, phone, notes).run();
 
       return json({ ok: true, code });
