@@ -1,0 +1,13 @@
+# No publicar código ni archivos internos como assets del sitio
+.git
+.wrangler
+.DS_Store
+.gitignore
+.assetsignore
+.dev.vars*
+.env*
+src
+map-wedding
+node_modules
+wrangler.jsonc
+README.md
