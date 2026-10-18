@@ -484,7 +484,22 @@ function setStatus(code, status, e) {
 
 // ── Copy link ──
 function copyLink(code, btn) {
-  navigator.clipboard.writeText('https://map-wedding.com/?code=' + code).then(() => {
+  // Solo el primer nombre del invitado (ej. "Andrés Porta" → "Andrés")
+  const fullName  = btn.closest('tr').cells[0].textContent.trim();
+  const firstName = fullName.split(' ').filter(Boolean)[0] || '';
+  const msg = [
+    '✨ ¡Ya falta poco! ' + firstName + ' ✨',
+    '',
+    '🖤Michelle & Andrés🖤',
+    '',
+    'Queremos asegurarnos de contar contigo en este día tan especial 🤍💍',
+    '¿Nos ayudas confirmando tu asistencia aquí?',
+    '',
+    '👉 https://map-wedding.com/?code=' + code,
+    '',
+    '¡Gracias! Nos hace muchísima ilusión celebrar contigo 🥂'
+  ].join('\\n');
+  navigator.clipboard.writeText(msg).then(() => {
     btn.textContent = '✓ Copiado';
     btn.classList.add('copied');
     setTimeout(() => { btn.textContent = '🔗 Copiar'; btn.classList.remove('copied'); }, 2000);
