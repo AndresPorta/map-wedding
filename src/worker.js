@@ -3,7 +3,7 @@
  * Estados de confirmed: 0 = pendiente, 1 = confirmó, -1 = canceló
  */
 
-const ADMIN_KEY      = 'map2026admin';
+// La clave del admin vive en el secreto ADMIN_KEY de Cloudflare (wrangler secret put ADMIN_KEY)
 const SESSION_COOKIE = 'map_admin_session';
 
 const CORS = {
@@ -19,13 +19,14 @@ function json(data, status = 200) {
   });
 }
 
-function isAdminAuthed(request, url) {
+function isAdminAuthed(request, url, env) {
+  if (!env.ADMIN_KEY) return false;
   const urlKey    = url.searchParams.get('key');
   const cookieStr = request.headers.get('Cookie') || '';
   const cookieKey = cookieStr.split(';')
     .find(c => c.trim().startsWith(SESSION_COOKIE + '='))
     ?.split('=')[1]?.trim();
-  return urlKey === ADMIN_KEY || cookieKey === ADMIN_KEY;
+  return urlKey === env.ADMIN_KEY || cookieKey === env.ADMIN_KEY;
 }
 
 export default {
@@ -107,7 +108,7 @@ export default {
     if (path === '/admin/login' && method === 'POST') {
       const form = await request.formData();
       const key  = form.get('key');
-      if (key !== ADMIN_KEY) {
+      if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
         return new Response(adminLoginHTML('Contraseña incorrecta.'), {
           status: 401,
           headers: { 'Content-Type': 'text/html;charset=UTF-8' },
@@ -117,14 +118,14 @@ export default {
         status: 302,
         headers: {
           'Location': '/admin',
-          'Set-Cookie': `${SESSION_COOKIE}=${ADMIN_KEY}; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`,
+          'Set-Cookie': `${SESSION_COOKIE}=${env.ADMIN_KEY}; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`,
         },
       });
     }
 
     // ── POST /admin/set-status  → cambiar estado desde el admin ──
     if (path === '/admin/set-status' && method === 'POST') {
-      if (!isAdminAuthed(request, url)) return json({ error: 'No autorizado' }, 401);
+      if (!isAdminAuthed(request, url, env)) return json({ error: 'No autorizado' }, 401);
 
       let body;
       try { body = await request.json(); }
@@ -150,7 +151,7 @@ export default {
 
     // ── POST /admin/guests/add ──
     if (path === '/admin/guests/add' && method === 'POST') {
-      if (!isAdminAuthed(request, url)) return json({ error: 'No autorizado' }, 401);
+      if (!isAdminAuthed(request, url, env)) return json({ error: 'No autorizado' }, 401);
 
       let body;
       try { body = await request.json(); }
@@ -178,7 +179,7 @@ export default {
 
     // ── POST /admin/guests/edit ──
     if (path === '/admin/guests/edit' && method === 'POST') {
-      if (!isAdminAuthed(request, url)) return json({ error: 'No autorizado' }, 401);
+      if (!isAdminAuthed(request, url, env)) return json({ error: 'No autorizado' }, 401);
 
       let body;
       try { body = await request.json(); }
@@ -201,7 +202,7 @@ export default {
 
     // ── POST /admin/guests/delete ──
     if (path === '/admin/guests/delete' && method === 'POST') {
-      if (!isAdminAuthed(request, url)) return json({ error: 'No autorizado' }, 401);
+      if (!isAdminAuthed(request, url, env)) return json({ error: 'No autorizado' }, 401);
 
       let body;
       try { body = await request.json(); }
@@ -217,7 +218,7 @@ export default {
 
     // ── GET /admin ──
     if (path === '/admin') {
-      if (!isAdminAuthed(request, url)) {
+      if (!isAdminAuthed(request, url, env)) {
         return new Response(adminLoginHTML(), {
           status: 401,
           headers: { 'Content-Type': 'text/html;charset=UTF-8' },
