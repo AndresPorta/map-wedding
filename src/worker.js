@@ -490,15 +490,22 @@ function copyLink(code, btn) {
   const firstName = fullName.split(' ').filter(Boolean)[0] || '';
   const msg = [
     '✨ ¡Ya falta poco! ' + firstName + ' ✨',
-    '',
     '🖤Michelle & Andrés🖤',
     '',
     'Queremos asegurarnos de contar contigo en este día tan especial 🤍💍',
     '¿Nos ayudas confirmando tu asistencia aquí?',
-    '',
     '👉 https://map-wedding.com/?code=' + code,
     '',
-    '¡Gracias! Nos hace muchísima ilusión celebrar contigo 🥂'
+    '✨ ¡Recuerda estos puntos clave! ✨',
+    '',
+    '🖤 El dress code es TOTAL BLACK 🖤',
+    '👗 Mujeres: vestido de noche negro, mate o satinado, sin brillos',
+    '🤵 Hombres: traje negro, corbata negra y camisa blanca o negra',
+    '',
+    '⛪ La misa es a las 16:15 h, aquí te dejamos la ubicación:',
+    '📍 https://maps.app.goo.gl/5tSV7MmnhGaYuH4H7',
+    '',
+    '¡Nos hace muchísima ilusión celebrar contigo! 🥂'
   ].join('\\n');
   navigator.clipboard.writeText(msg).then(() => {
     btn.textContent = '✓ Copiado';
