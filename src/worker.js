@@ -2,9 +2,17 @@
  * MAP Wedding — Cloudflare Worker
  * Estados de confirmed: 0 = pendiente, 1 = confirmó, -1 = canceló
  */
+import { adminPageHTML, loginPageHTML } from './admin-page.js';
 
-// La clave del admin vive en el secreto ADMIN_KEY de Cloudflare (wrangler secret put ADMIN_KEY)
-const SESSION_COOKIE = 'map_admin_session';
+// La clave del admin vive en el secreto ADMIN_KEY de Cloudflare (wrangler secret put ADMIN_KEY).
+// La cookie de sesión no guarda la clave: guarda una fecha de expiración firmada con ella
+// (HMAC). Cambiar la clave cierra todas las sesiones.
+const SESSION_COOKIE = 'map_admin';
+const SESSION_HOURS  = 8;
+const CODE_CHARS     = 'abcdefghijkmnpqrstuvwxyz23456789';
+const STATUS         = { pending: 0, confirmed: 1, cancelled: -1 };
+const STATUS_NAME    = { 0: 'pending', 1: 'confirmed', '-1': 'cancelled' };
+const enc = new TextEncoder();
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -17,16 +25,6 @@ function json(data, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json', ...CORS },
   });
-}
-
-function isAdminAuthed(request, url, env) {
-  if (!env.ADMIN_KEY) return false;
-  const urlKey    = url.searchParams.get('key');
-  const cookieStr = request.headers.get('Cookie') || '';
-  const cookieKey = cookieStr.split(';')
-    .find(c => c.trim().startsWith(SESSION_COOKIE + '='))
-    ?.split('=')[1]?.trim();
-  return urlKey === env.ADMIN_KEY || cookieKey === env.ADMIN_KEY;
 }
 
 export default {
@@ -107,564 +105,170 @@ export default {
     // ── POST /admin/login ──
     if (path === '/admin/login' && method === 'POST') {
       const form = await request.formData();
-      const key  = form.get('key');
-      if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
-        return new Response(adminLoginHTML('Contraseña incorrecta.'), {
-          status: 401,
-          headers: { 'Content-Type': 'text/html;charset=UTF-8' },
-        });
+      const key  = String(form.get('key') || '');
+      if (!env.ADMIN_KEY || !(await sameText(key, env.ADMIN_KEY))) {
+        return html(loginPageHTML('Contraseña incorrecta.'), 401);
       }
+      const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
       return new Response(null, {
-        status: 302,
+        status: 303,
         headers: {
-          'Location': '/admin',
-          'Set-Cookie': `${SESSION_COOKIE}=${env.ADMIN_KEY}; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`,
+          'Location':   '/admin',
+          'Set-Cookie': `${SESSION_COOKIE}=${exp}.${await sign(env.ADMIN_KEY, exp)}; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_HOURS * 3600}`,
         },
       });
     }
 
-    // ── POST /admin/set-status  → cambiar estado desde el admin ──
-    if (path === '/admin/set-status' && method === 'POST') {
-      if (!isAdminAuthed(request, url, env)) return json({ error: 'No autorizado' }, 401);
-
-      let body;
-      try { body = await request.json(); }
-      catch { return json({ error: 'JSON inválido' }, 400); }
-
-      const code   = body?.code?.trim()?.toLowerCase();
-      const status = body?.status; // 'confirmed' | 'pending' | 'cancelled'
-      if (!code || !['confirmed','pending','cancelled'].includes(status)) {
-        return json({ error: 'Parámetros inválidos' }, 400);
-      }
-
-      const value = status === 'confirmed' ? 1 : status === 'cancelled' ? -1 : 0;
-      const atSql = status === 'confirmed'
-        ? "confirmed = ?, confirmed_at = datetime('now')"
-        : 'confirmed = ?, confirmed_at = NULL';
-
-      await env.MAP_DB.prepare(
-        `UPDATE guests SET ${atSql} WHERE code = ?`
-      ).bind(value, code).run();
-
-      return json({ ok: true });
+    // ── POST /admin/logout ──
+    if (path === '/admin/logout' && method === 'POST') {
+      return new Response(null, {
+        status: 303,
+        headers: {
+          'Location':   '/admin',
+          'Set-Cookie': `${SESSION_COOKIE}=; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=0`,
+        },
+      });
     }
 
-    // ── POST /admin/guests/add ──
-    if (path === '/admin/guests/add' && method === 'POST') {
-      if (!isAdminAuthed(request, url, env)) return json({ error: 'No autorizado' }, 401);
-
-      let body;
-      try { body = await request.json(); }
-      catch { return json({ error: 'JSON inválido' }, 400); }
-
-      const name    = body?.name?.trim();
-      const tickets = parseInt(body?.tickets) || 1;
-      const phone   = body?.phone?.trim() || null;
-      const notes   = body?.notes?.trim() || null;
-      const code    = body?.code?.trim()?.toLowerCase();
-
-      if (!name || !code) return json({ error: 'Nombre y código son requeridos' }, 400);
-
-      const existing = await env.MAP_DB.prepare(
-        'SELECT id FROM guests WHERE code = ?'
-      ).bind(code).first();
-      if (existing) return json({ error: 'El código ya existe' }, 409);
-
-      await env.MAP_DB.prepare(
-        'INSERT INTO guests (name, code, tickets, phone, notes, confirmed, confirmed_at) VALUES (?, ?, ?, ?, ?, 0, NULL)'
-      ).bind(name, code, tickets, phone, notes).run();
-
-      return json({ ok: true, code });
+    // ── GET /admin → login o panel (el panel pide la lista a /admin/guests) ──
+    if ((path === '/admin' || path === '/admin/') && method === 'GET') {
+      return (await isAdminAuthed(request, env)) ? html(adminPageHTML()) : html(loginPageHTML(), 401);
     }
 
-    // ── POST /admin/guests/edit ──
-    if (path === '/admin/guests/edit' && method === 'POST') {
-      if (!isAdminAuthed(request, url, env)) return json({ error: 'No autorizado' }, 401);
+    if (path.startsWith('/admin/')) {
+      if (!(await isAdminAuthed(request, env))) return json({ error: 'No autorizado' }, 401);
 
-      let body;
-      try { body = await request.json(); }
-      catch { return json({ error: 'JSON inválido' }, 400); }
-
-      const code    = body?.code?.trim()?.toLowerCase();
-      const name    = body?.name?.trim();
-      const tickets = parseInt(body?.tickets) || 1;
-      const phone   = body?.phone?.trim() || null;
-      const notes   = body?.notes?.trim() || null;
-
-      if (!code || !name) return json({ error: 'Código y nombre son requeridos' }, 400);
-
-      await env.MAP_DB.prepare(
-        'UPDATE guests SET name = ?, tickets = ?, phone = ?, notes = ? WHERE code = ?'
-      ).bind(name, tickets, phone, notes, code).run();
-
-      return json({ ok: true });
-    }
-
-    // ── POST /admin/guests/delete ──
-    if (path === '/admin/guests/delete' && method === 'POST') {
-      if (!isAdminAuthed(request, url, env)) return json({ error: 'No autorizado' }, 401);
-
-      let body;
-      try { body = await request.json(); }
-      catch { return json({ error: 'JSON inválido' }, 400); }
-
-      const code = body?.code?.trim()?.toLowerCase();
-      if (!code) return json({ error: 'Código requerido' }, 400);
-
-      await env.MAP_DB.prepare('DELETE FROM guests WHERE code = ?').bind(code).run();
-
-      return json({ ok: true });
-    }
-
-    // ── GET /admin ──
-    if (path === '/admin') {
-      if (!isAdminAuthed(request, url, env)) {
-        return new Response(adminLoginHTML(), {
-          status: 401,
-          headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+      // ── GET /admin/guests ──
+      if (path === '/admin/guests' && method === 'GET') {
+        const { results } = await env.MAP_DB.prepare(
+          'SELECT code, name, tickets, confirmed, confirmed_at, phone, notes FROM guests ORDER BY name COLLATE NOCASE'
+        ).all();
+        return json({
+          ok: true,
+          guests: results.map(({ confirmed, ...g }) => ({ ...g, status: STATUS_NAME[confirmed] ?? 'pending' })),
         });
       }
 
-      const { results } = await env.MAP_DB.prepare(
-        'SELECT code, name, tickets, confirmed, confirmed_at, phone, notes FROM guests ORDER BY confirmed DESC, name ASC'
-      ).all();
+      // ── POST /admin/guests/save → alta (sin code) o edición (con code) ──
+      if (path === '/admin/guests/save' && method === 'POST') {
+        const body    = await readJson(request);
+        const name    = body?.name?.trim();
+        const tickets = parseInt(body?.tickets, 10);
+        const phone   = body?.phone?.trim() || null;
+        const notes   = body?.notes?.trim() || null;
+        if (!name) return json({ error: 'El nombre es obligatorio' }, 400);
+        if (!(tickets >= 1 && tickets <= 20)) return json({ error: 'Los boletos van de 1 a 20' }, 400);
 
-      const total     = results.length;
-      const confirmed = results.filter(g => g.confirmed === 1).length;
-      const cancelled = results.filter(g => g.confirmed === -1).length;
-      const pending   = total - confirmed - cancelled;
-      const seats     = results.reduce((s, g) => s + g.tickets, 0);
-      const seatsConf = results.filter(g => g.confirmed === 1).reduce((s, g) => s + g.tickets, 0);
+        if (body.code) {
+          const code = body.code.trim().toLowerCase();
+          const { meta } = await env.MAP_DB.prepare(
+            'UPDATE guests SET name = ?, tickets = ?, phone = ?, notes = ? WHERE code = ?'
+          ).bind(name, tickets, phone, notes, code).run();
+          if (!meta.changes) return json({ error: 'Invitado no encontrado' }, 404);
+          return json({ ok: true, code });
+        }
 
-      return new Response(adminDashboardHTML(results, { total, confirmed, cancelled, pending, seats, seatsConf }), {
-        headers: { 'Content-Type': 'text/html;charset=UTF-8' },
-      });
+        // Código nuevo al azar; si choca con uno existente (casi imposible) se intenta otro
+        for (let i = 0; i < 5; i++) {
+          const code = randomCode();
+          const { meta } = await env.MAP_DB.prepare(
+            'INSERT OR IGNORE INTO guests (name, code, tickets, phone, notes, confirmed, confirmed_at) VALUES (?, ?, ?, ?, ?, 0, NULL)'
+          ).bind(name, code, tickets, phone, notes).run();
+          if (meta.changes) return json({ ok: true, code });
+        }
+        return json({ error: 'No se pudo generar el código, intenta de nuevo' }, 500);
+      }
+
+      // ── POST /admin/guests/status ──
+      if (path === '/admin/guests/status' && method === 'POST') {
+        const body   = await readJson(request);
+        const code   = body?.code?.trim()?.toLowerCase();
+        const status = body?.status;
+        if (!code || !Object.hasOwn(STATUS, status)) return json({ error: 'Parámetros inválidos' }, 400);
+
+        const atSql = status === 'confirmed' ? "datetime('now')" : 'NULL';
+        const { meta } = await env.MAP_DB.prepare(
+          `UPDATE guests SET confirmed = ?, confirmed_at = ${atSql} WHERE code = ?`
+        ).bind(STATUS[status], code).run();
+        if (!meta.changes) return json({ error: 'Invitado no encontrado' }, 404);
+        return json({ ok: true });
+      }
+
+      // ── POST /admin/guests/delete ──
+      if (path === '/admin/guests/delete' && method === 'POST') {
+        const code = (await readJson(request))?.code?.trim()?.toLowerCase();
+        if (!code) return json({ error: 'Código requerido' }, 400);
+        await env.MAP_DB.prepare('DELETE FROM guests WHERE code = ?').bind(code).run();
+        return json({ ok: true });
+      }
+
+      return json({ error: 'No encontrado' }, 404);
     }
 
     return env.ASSETS.fetch(request);
   },
 };
 
+// ── Sesión del admin ──
+async function isAdminAuthed(request, env) {
+  if (!env.ADMIN_KEY) return false;
+  const cookie = (request.headers.get('Cookie') || '')
+    .split(';').map(c => c.trim())
+    .find(c => c.startsWith(SESSION_COOKIE + '='));
+  const [exp, sig] = (cookie?.slice(SESSION_COOKIE.length + 1) || '').split('.');
+  if (!exp || !sig || !(Number(exp) > Date.now())) return false;
 
-// ─────────────────────────────────────────────
-//  HTML del panel admin
-// ─────────────────────────────────────────────
-function adminDashboardHTML(guests, stats) {
-  const rows = guests.map(g => {
-    const status     = g.confirmed === 1 ? 'confirmed' : g.confirmed === -1 ? 'cancelled' : 'pending';
-    const badgeClass = status === 'confirmed' ? 'badge-yes' : status === 'cancelled' ? 'badge-cancel' : 'badge-no';
-    const badgeText  = status === 'confirmed' ? '✓ Confirmó' : status === 'cancelled' ? '✕ Canceló' : '— Pendiente';
-    const rowClass   = status;
-
-    const otherStatuses = ['confirmed','pending','cancelled']
-      .filter(s => s !== status)
-      .map(s => {
-        const label = s === 'confirmed' ? '✓ Confirmó' : s === 'cancelled' ? '✕ Canceló' : '— Pendiente';
-        return `<button class="status-opt" onclick="setStatus('${escHtml(g.code)}','${s}',event)">${label}</button>`;
-      }).join('');
-
-    return `
-    <tr class="${rowClass}" data-code="${escHtml(g.code)}">
-      <td>${escHtml(g.name)}</td>
-      <td class="center">${g.tickets}</td>
-      <td class="center">
-        <div class="badge-wrap">
-          <span class="badge ${badgeClass}" onclick="toggleMenu(this)" title="Clic para cambiar estado">${badgeText} ▾</span>
-          <div class="status-menu">${otherStatuses}</div>
-        </div>
-      </td>
-      <td class="soft">${g.confirmed_at ? g.confirmed_at.replace('T',' ').substring(0,16) : '—'}</td>
-      <td class="soft">${g.phone ? escHtml(g.phone) : '—'}</td>
-      <td class="soft">${g.notes ? escHtml(g.notes) : ''}</td>
-      <td class="center actions-cell">
-        <button class="btn-action btn-copy" onclick="copyLink('${escHtml(g.code)}', this)">🔗 Copiar</button>
-        <button class="btn-action btn-edit" onclick="openEditModal('${escHtml(g.code)}','${escHtml(g.name)}',${g.tickets},'${escHtml(g.phone||'')}','${escHtml(g.notes||'')}')">✏️ Editar</button>
-        <button class="btn-action btn-delete" onclick="deleteGuest('${escHtml(g.code)}','${escHtml(g.name)}')">🗑️ Eliminar</button>
-      </td>
-    </tr>`;
-  }).join('');
-
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>MAP · Panel de Confirmaciones</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:system-ui,sans-serif;background:#f5f5f5;color:#222;padding:2rem 1rem}
-  .header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem}
-  h1{font-size:1.5rem;color:#1a1a1a}
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1rem;margin-bottom:2rem}
-  .stat{background:#fff;border-radius:12px;padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.07);text-align:center}
-  .stat-num{font-size:2rem;font-weight:700;color:#2563eb}
-  .stat-label{font-size:.78rem;color:#666;margin-top:.25rem;text-transform:uppercase;letter-spacing:.08em}
-  .stat.green .stat-num{color:#16a34a}
-  .stat.orange .stat-num{color:#ea580c}
-  .stat.red .stat-num{color:#dc2626}
-  table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07)}
-  th{background:#1e293b;color:#fff;padding:.75rem 1rem;text-align:left;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase}
-  td{padding:.65rem 1rem;border-bottom:1px solid #f0f0f0;font-size:.88rem;vertical-align:middle}
-  tr:last-child td{border-bottom:none}
-  tr.confirmed td{background:#f0fdf4}
-  tr.cancelled td{background:#fff5f5}
-  /* Badge con menú */
-  .badge-wrap{position:relative;display:inline-block}
-  .badge{display:inline-block;padding:.25rem .7rem;border-radius:999px;font-size:.76rem;font-weight:600;cursor:pointer;user-select:none;transition:opacity .15s}
-  .badge:hover{opacity:.85}
-  .badge-yes{background:#dcfce7;color:#166534}
-  .badge-no{background:#fef3c7;color:#92400e}
-  .badge-cancel{background:#fee2e2;color:#991b1b}
-  .status-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:100;min-width:130px;overflow:hidden}
-  .status-menu.open{display:block}
-  .status-opt{display:block;width:100%;padding:.55rem .9rem;background:none;border:none;cursor:pointer;font-size:.82rem;text-align:left;transition:background .1s}
-  .status-opt:hover{background:#f1f5f9}
-  .center{text-align:center}
-  .soft{color:#888;font-size:.81rem}
-  .btn-action{padding:.35rem .8rem;border-radius:8px;border:1px solid #e2e8f0;cursor:pointer;font-size:.79rem;font-weight:500;background:#f8fafc;color:#334155;transition:all .15s}
-  .btn-action:hover{background:#e2e8f0}
-  .btn-action.copied{background:#dcfce7;color:#166534;border-color:#bbf7d0}
-  .btn-edit{border-color:#bfdbfe;color:#1d4ed8;background:#eff6ff}
-  .btn-edit:hover{background:#dbeafe}
-  .btn-delete{border-color:#fecaca;color:#b91c1c;background:#fff5f5}
-  .btn-delete:hover{background:#fee2e2}
-  .actions-cell{display:flex;gap:.4rem;justify-content:center;flex-wrap:wrap}
-  .bottom-row{margin-top:1.5rem;display:flex;gap:1rem;flex-wrap:wrap}
-  .btn{padding:.65rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.9rem;font-weight:600}
-  .btn-green{background:#16a34a;color:#fff}
-  .btn-primary{background:#1e293b;color:#fff}
-  /* Modal */
-  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
-  .modal-overlay.open{display:flex}
-  .modal{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-  .modal h2{font-size:1.15rem;margin-bottom:1.25rem;color:#1a1a1a}
-  .field{margin-bottom:1rem}
-  .field label{display:block;font-size:.8rem;font-weight:600;color:#555;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.06em}
-  .field input{width:100%;padding:.65rem .9rem;border:1px solid #ddd;border-radius:8px;font-size:.95rem;font-family:inherit}
-  .field input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
-  .modal-actions{display:flex;gap:.75rem;margin-top:1.5rem;justify-content:flex-end}
-  .btn-cancel-modal{background:#f1f5f9;color:#334155;padding:.65rem 1.2rem;border-radius:8px;border:none;cursor:pointer;font-size:.9rem;font-weight:600}
-  .msg-success{background:#dcfce7;color:#166534;padding:.75rem 1rem;border-radius:8px;font-size:.88rem;margin-top:.75rem;display:none}
-  .msg-error{background:#fee2e2;color:#991b1b;padding:.75rem 1rem;border-radius:8px;font-size:.88rem;margin-top:.75rem;display:none}
-</style>
-</head>
-<body>
-<div class="header-row">
-  <h1>MAP · Panel de Confirmaciones</h1>
-  <button class="btn btn-primary" onclick="openModal()">＋ Agregar invitado</button>
-</div>
-
-<div class="stats">
-  <div class="stat"><div class="stat-num">${stats.total}</div><div class="stat-label">Invitados</div></div>
-  <div class="stat green"><div class="stat-num">${stats.confirmed}</div><div class="stat-label">Confirmaron</div></div>
-  <div class="stat orange"><div class="stat-num">${stats.pending}</div><div class="stat-label">Pendientes</div></div>
-  <div class="stat red"><div class="stat-num">${stats.cancelled}</div><div class="stat-label">Cancelaron</div></div>
-  <div class="stat"><div class="stat-num">${stats.seats}</div><div class="stat-label">Lugares totales</div></div>
-  <div class="stat green"><div class="stat-num">${stats.seatsConf}</div><div class="stat-label">Confirmados</div></div>
-</div>
-
-<table>
-  <thead><tr>
-    <th>Nombre</th><th>Boletos</th><th>Estado</th><th>Fecha</th><th>Teléfono</th><th>Notas</th><th>Link</th>
-  </tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-
-<div class="bottom-row">
-  <button class="btn btn-green" onclick="exportCSV()">⬇ Exportar CSV</button>
-</div>
-
-<!-- Modal: agregar invitado -->
-<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
-  <div class="modal">
-    <h2>Agregar invitado</h2>
-    <div class="field">
-      <label>Nombre completo *</label>
-      <input type="text" id="f-name" placeholder="Ej: Ana López"/>
-    </div>
-    <div class="field">
-      <label>Boletos *</label>
-      <input type="number" id="f-tickets" value="1" min="1" max="20" style="max-width:120px"/>
-    </div>
-    <div class="field">
-      <label>Teléfono</label>
-      <input type="text" id="f-phone" placeholder="+52 55 1234 5678"/>
-    </div>
-    <div class="field">
-      <label>Notas</label>
-      <input type="text" id="f-notes" placeholder="Ej: Mesa 3, vegetariano…"/>
-    </div>
-    <div class="msg-success" id="modal-success">¡Invitado agregado! Recargando…</div>
-    <div class="msg-error" id="modal-error"></div>
-    <div class="modal-actions">
-      <button class="btn-cancel-modal" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitGuest()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: editar invitado -->
-<div class="modal-overlay" id="edit-overlay" onclick="closeEditOutside(event)">
-  <div class="modal">
-    <h2>Editar invitado</h2>
-    <input type="hidden" id="e-code"/>
-    <div class="field">
-      <label>Nombre completo *</label>
-      <input type="text" id="e-name"/>
-    </div>
-    <div class="field">
-      <label>Boletos *</label>
-      <input type="number" id="e-tickets" min="1" max="20" style="max-width:120px"/>
-    </div>
-    <div class="field">
-      <label>Teléfono</label>
-      <input type="text" id="e-phone"/>
-    </div>
-    <div class="field">
-      <label>Notas</label>
-      <input type="text" id="e-notes"/>
-    </div>
-    <div class="msg-error" id="edit-error"></div>
-    <div class="modal-actions">
-      <button class="btn-cancel-modal" onclick="closeEditModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitEdit()">Guardar cambios</button>
-    </div>
-  </div>
-</div>
-
-<script>
-// ── Cerrar menús abiertos al hacer clic fuera ──
-document.addEventListener('click', e => {
-  if (!e.target.closest('.badge-wrap')) {
-    document.querySelectorAll('.status-menu.open').forEach(m => m.classList.remove('open'));
+  try {
+    return await crypto.subtle.verify('HMAC', await hmacKey(env.ADMIN_KEY), fromBase64Url(sig), enc.encode(`map-admin.${exp}`));
+  } catch {
+    return false;
   }
-});
-
-// ── Toggle menú de estado ──
-function toggleMenu(badge) {
-  const menu = badge.nextElementSibling;
-  const wasOpen = menu.classList.contains('open');
-  document.querySelectorAll('.status-menu.open').forEach(m => m.classList.remove('open'));
-  if (!wasOpen) menu.classList.add('open');
 }
 
-// ── Cambiar estado desde admin ──
-function setStatus(code, status, e) {
-  e.stopPropagation();
-  const row     = document.querySelector('tr[data-code="' + code + '"]');
-  const menu    = row.querySelector('.status-menu');
-  const badge   = row.querySelector('.badge');
-  menu.classList.remove('open');
-
-  const labels   = { confirmed:'✓ Confirmó', pending:'— Pendiente', cancelled:'✕ Canceló' };
-  const classes  = { confirmed:'badge-yes',  pending:'badge-no',     cancelled:'badge-cancel' };
-  const rowCls   = { confirmed:'confirmed',  pending:'pending',       cancelled:'cancelled' };
-
-  fetch('/admin/set-status', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ code, status })
-  })
-  .then(r => r.json())
-  .then(d => {
-    if (!d.ok) { alert('Error al cambiar estado'); return; }
-    // Actualizar badge
-    badge.className = 'badge ' + classes[status];
-    badge.textContent = labels[status] + ' ▾';
-    // Actualizar fila
-    ['confirmed','pending','cancelled'].forEach(c => row.classList.remove(c));
-    row.classList.add(rowCls[status]);
-    // Actualizar opciones del menú
-    const others = ['confirmed','pending','cancelled'].filter(s => s !== status);
-    menu.innerHTML = others.map(s =>
-      '<button class="status-opt" onclick="setStatus(\\''+code+'\\',\\''+s+'\\',event)">'+labels[s]+'</button>'
-    ).join('');
-  })
-  .catch(() => alert('Error de red'));
+async function sign(secret, exp) {
+  const sig = await crypto.subtle.sign('HMAC', await hmacKey(secret), enc.encode(`map-admin.${exp}`));
+  return toBase64Url(new Uint8Array(sig));
 }
 
-// ── Copy link ──
-function copyLink(code, btn) {
-  // Solo el primer nombre del invitado (ej. "Andrés Porta" → "Andrés")
-  const fullName  = btn.closest('tr').cells[0].textContent.trim();
-  const firstName = fullName.split(' ').filter(Boolean)[0] || '';
-  const msg = [
-    '✨ ¡Ya falta poco! ' + firstName + ' ✨',
-    '🖤Michelle & Andrés🖤',
-    '',
-    'Queremos asegurarnos de contar contigo en este día tan especial 🤍💍',
-    '¿Nos ayudas confirmando tu asistencia aquí?',
-    '👉 https://map-wedding.com/?code=' + code,
-    '',
-    '✨ ¡Recuerda estos puntos clave! ✨',
-    '',
-    '🖤 El dress code es TOTAL BLACK 🖤',
-    '👗 Mujeres: vestido de noche negro, mate o satinado, sin brillos',
-    '🤵 Hombres: traje negro, corbata negra y camisa blanca o negra',
-    '',
-    '⛪ La misa es a las 16:15 h, aquí te dejamos la ubicación:',
-    '📍 https://maps.app.goo.gl/5tSV7MmnhGaYuH4H7',
-    '',
-    '¡Nos hace muchísima ilusión celebrar contigo! 🥂'
-  ].join('\\n');
-  navigator.clipboard.writeText(msg).then(() => {
-    btn.textContent = '✓ Copiado';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = '🔗 Copiar'; btn.classList.remove('copied'); }, 2000);
-  });
+function hmacKey(secret) {
+  return crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
 
-// ── Modal ──
-function openModal() {
-  document.getElementById('modal-overlay').classList.add('open');
-  document.getElementById('f-name').focus();
-}
-function closeModal() {
-  document.getElementById('modal-overlay').classList.remove('open');
-  ['f-name','f-phone','f-notes'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('f-tickets').value = 1;
-  document.getElementById('modal-success').style.display = 'none';
-  document.getElementById('modal-error').style.display = 'none';
-}
-function closeModalOutside(e) {
-  if (e.target === document.getElementById('modal-overlay')) closeModal();
+/** Compara la clave sin filtrar por tiempo cuántos caracteres coinciden. */
+async function sameText(a, b) {
+  const [x, y] = await Promise.all([a, b].map(s => crypto.subtle.digest('SHA-256', enc.encode(s))));
+  const u = new Uint8Array(x), v = new Uint8Array(y);
+  let diff = 0;
+  for (let i = 0; i < u.length; i++) diff |= u[i] ^ v[i];
+  return diff === 0;
 }
 
+// ── Utilidades ──
 function randomCode() {
-  const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
-  return Array.from(crypto.getRandomValues(new Uint8Array(8)))
-    .map(b => chars[b % chars.length]).join('');
+  return Array.from(crypto.getRandomValues(new Uint8Array(8)), b => CODE_CHARS[b % CODE_CHARS.length]).join('');
 }
 
-function submitGuest() {
-  const name    = document.getElementById('f-name').value.trim();
-  const tickets = parseInt(document.getElementById('f-tickets').value) || 1;
-  const code    = randomCode();
-  const phone   = document.getElementById('f-phone').value.trim() || null;
-  const notes   = document.getElementById('f-notes').value.trim() || null;
-  const errEl   = document.getElementById('modal-error');
-  const okEl    = document.getElementById('modal-success');
-
-  errEl.style.display = 'none';
-  if (!name) { errEl.textContent = 'El nombre es obligatorio.'; errEl.style.display = 'block'; return; }
-
-  fetch('/admin/guests/add', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ name, tickets, code, phone, notes })
-  })
-  .then(r => r.json())
-  .then(d => {
-    if (!d.ok) { errEl.textContent = d.error || 'Error al guardar.'; errEl.style.display = 'block'; return; }
-    okEl.style.display = 'block';
-    setTimeout(() => location.reload(), 1200);
-  })
-  .catch(() => { errEl.textContent = 'Error de red.'; errEl.style.display = 'block'; });
+async function readJson(request) {
+  try { return await request.json(); } catch { return null; }
 }
 
-// ── Editar invitado ──
-function openEditModal(code, name, tickets, phone, notes) {
-  document.getElementById('e-code').value    = code;
-  document.getElementById('e-name').value    = name;
-  document.getElementById('e-tickets').value = tickets;
-  document.getElementById('e-phone').value   = phone;
-  document.getElementById('e-notes').value   = notes;
-  document.getElementById('edit-error').style.display = 'none';
-  document.getElementById('edit-overlay').classList.add('open');
-  document.getElementById('e-name').focus();
-}
-function closeEditModal() {
-  document.getElementById('edit-overlay').classList.remove('open');
-}
-function closeEditOutside(e) {
-  if (e.target === document.getElementById('edit-overlay')) closeEditModal();
-}
-function submitEdit() {
-  const code    = document.getElementById('e-code').value;
-  const name    = document.getElementById('e-name').value.trim();
-  const tickets = parseInt(document.getElementById('e-tickets').value) || 1;
-  const phone   = document.getElementById('e-phone').value.trim() || null;
-  const notes   = document.getElementById('e-notes').value.trim() || null;
-  const errEl   = document.getElementById('edit-error');
-
-  errEl.style.display = 'none';
-  if (!name) { errEl.textContent = 'El nombre es obligatorio.'; errEl.style.display = 'block'; return; }
-
-  fetch('/admin/guests/edit', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ code, name, tickets, phone, notes })
-  })
-  .then(r => r.json())
-  .then(d => {
-    if (!d.ok) { errEl.textContent = d.error || 'Error al guardar.'; errEl.style.display = 'block'; return; }
-    // Actualizar fila en el DOM sin recargar
-    const row = document.querySelector('tr[data-code="' + code + '"]');
-    const cells = row.querySelectorAll('td');
-    cells[0].textContent = name;
-    cells[1].textContent = tickets;
-    cells[4].textContent = phone || '—';
-    cells[5].textContent = notes || '';
-    closeEditModal();
-  })
-  .catch(() => { errEl.textContent = 'Error de red.'; errEl.style.display = 'block'; });
-}
-
-// ── Eliminar invitado ──
-function deleteGuest(code, name) {
-  if (!confirm('¿Eliminar a ' + name + '? Esta acción no se puede deshacer.')) return;
-  fetch('/admin/guests/delete', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ code })
-  })
-  .then(r => r.json())
-  .then(d => {
-    if (!d.ok) { alert('Error al eliminar'); return; }
-    document.querySelector('tr[data-code="' + code + '"]').remove();
-  })
-  .catch(() => alert('Error de red'));
-}
-
-// ── Export CSV ──
-function exportCSV() {
-  const rows = [['Nombre','Boletos','Estado','Fecha','Telefono','Notas']];
-  document.querySelectorAll('tbody tr').forEach(tr => {
-    const cells = [...tr.querySelectorAll('td')].slice(0,6);
-    rows.push(cells.map(td => '"' + td.innerText.replace(/"/g,'""') + '"'));
+function html(body, status = 200) {
+  return new Response(body, {
+    status,
+    headers: {
+      'Content-Type': 'text/html;charset=UTF-8',
+      'Cache-Control': 'no-store',
+      'X-Robots-Tag': 'noindex',
+      'X-Frame-Options': 'DENY',
+    },
   });
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(rows.map(r => r.join(',')).join('\\n'));
-  a.download = 'confirmaciones.csv'; a.click();
-}
-</script>
-</body></html>`;
 }
 
-function adminLoginHTML(error = '') {
-  return `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"/>
-<title>Admin · MAP</title>
-<style>
-  body{font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f5}
-  form{background:#fff;padding:2rem;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.1);width:320px;text-align:center}
-  h2{margin-bottom:1.5rem;font-size:1.2rem}
-  input{width:100%;padding:.7rem 1rem;border:1px solid #ddd;border-radius:8px;font-size:1rem;margin-bottom:1rem}
-  button{width:100%;padding:.75rem;background:#1e293b;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:600}
-  .error{color:#dc2626;font-size:.85rem;margin-bottom:.75rem}
-</style></head>
-<body>
-<form method="POST" action="/admin/login">
-  <h2>Panel MAP</h2>
-  ${error ? `<p class="error">${error}</p>` : ''}
-  <input type="password" name="key" placeholder="Contraseña" autofocus/>
-  <button>Entrar</button>
-</form>
-</body></html>`;
+function toBase64Url(bytes) {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function fromBase64Url(str) {
+  const bin = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(bin, c => c.charCodeAt(0));
 }
